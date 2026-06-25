@@ -1,4 +1,7 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace Maidas.Api.Controllers;
 
@@ -42,6 +45,65 @@ public class AuthController(UserManager<ApplicationUser> userManager, SignInMana
 		}
 		await _identityEmailService.SendConfirmationEmailAsync(user);
 		return Ok();
+	}
+	[HttpPost("confirm-email")]
+	public async Task<IActionResult> ConfirmEmail(
+	[FromQuery] string userId,
+	[FromQuery] string token)
+	{
+		var user = await _userManager.FindByIdAsync(userId);
+
+		if (user is null)
+		{
+			return BadRequest();
+		}
+
+		token = Encoding.UTF8.GetString(
+			WebEncoders.Base64UrlDecode(token));
+
+		var result =
+			await _userManager.ConfirmEmailAsync(user, token);
+
+		if (!result.Succeeded)
+		{
+			return BadRequest();
+		}
+
+		return Ok();
+	}
+	[HttpPost("login")]
+	public async Task<IActionResult> Login(LoginDto model)
+	{
+		var user = await _userManager.FindByEmailAsync(model.Email);
+
+		if (user is null)
+		{
+			return Unauthorized();
+		}
+
+		if (!await _userManager.IsEmailConfirmedAsync(user))
+		{
+			return BadRequest(new
+			{
+				Message = "Email is not confirmed."
+			});
+		}
+
+		var result = await _signInManager.PasswordSignInAsync(
+			user,
+			model.Password,
+			isPersistent: false,
+			lockoutOnFailure: true);
+
+		if (!result.Succeeded)
+		{
+			return Unauthorized();
+		}
+
+		return Ok(new
+		{
+			Message = "Logged in successfully."
+		});
 	}
 }
 
