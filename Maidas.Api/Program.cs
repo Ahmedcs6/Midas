@@ -9,6 +9,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 	options.User.RequireUniqueEmail = true;
 	options.SignIn.RequireConfirmedEmail = true;
 })
+.AddUserValidator<CustomUserValidator>()
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 builder.Services.Configure<EmailSettings>(

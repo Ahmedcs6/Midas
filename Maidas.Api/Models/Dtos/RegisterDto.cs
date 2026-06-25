@@ -1,4 +1,4 @@
-namespace Maidas.Api.Models;
+namespace Maidas.Api.Models.Dtos;
 
 public class RegisterDto
 {
@@ -6,6 +6,8 @@ public class RegisterDto
 	public string FirstName { get; set; } = string.Empty;
 	[Required]
 	public string LastName { get; set; } = string.Empty;
+	[Required]
+	public GenderType Gender { get; set; } = 0;
 	[Required]
 	public string UserName { get; set; } = string.Empty;
 	[Required, EmailAddress]

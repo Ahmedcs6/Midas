@@ -1,4 +1,4 @@
-namespace Maidas.Api.Models;
+namespace Maidas.Api.Models.Dtos;
 
 public class LoginDto
 {

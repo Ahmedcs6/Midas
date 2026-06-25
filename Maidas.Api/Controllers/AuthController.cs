@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 
@@ -21,6 +21,7 @@ public class AuthController(UserManager<ApplicationUser> userManager, SignInMana
 			FirstName = model.FirstName,
 			LastName = model.LastName,
 			UserName = model.UserName,
+			Gender = model.Gender,
 			Email = model.Email
 		};
 		IdentityResult result = await _userManager.CreateAsync(user, model.Password);
@@ -83,10 +84,7 @@ public class AuthController(UserManager<ApplicationUser> userManager, SignInMana
 
 		if (!await _userManager.IsEmailConfirmedAsync(user))
 		{
-			return BadRequest(new
-			{
-				Message = "Email is not confirmed."
-			});
+			return BadRequest("Email is not confirmed.");
 		}
 
 		var result = await _signInManager.PasswordSignInAsync(
@@ -100,10 +98,36 @@ public class AuthController(UserManager<ApplicationUser> userManager, SignInMana
 			return Unauthorized();
 		}
 
-		return Ok(new
-		{
-			Message = "Logged in successfully."
-		});
+		return Ok();
+	}
+	[HttpPost("logout")]
+	public async Task<IActionResult> Logout()
+	{
+		await _signInManager.SignOutAsync();
+		return Ok();
+	}
+	[Authorize]
+	[HttpDelete("account")]
+	public async Task<IActionResult> Delete(DeleteAccountDto model)
+	{
+		var user = await _userManager.GetUserAsync(User);
+		if (user is null)
+			return Unauthorized();
+
+		bool validPassword =
+			await _userManager.CheckPasswordAsync(user, model.Password);
+
+		if (!validPassword)
+			return BadRequest("Invalid password.");
+
+		var result = await _userManager.DeleteAsync(user);
+
+		if (!result.Succeeded)
+			return BadRequest(result.Errors);
+
+		await _signInManager.SignOutAsync();
+
+		return NoContent();
 	}
 }
 
