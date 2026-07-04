@@ -1,5 +1,5 @@
 #!/bin/bash
 
-dotnet run --project Maidas.Api &
-dotnet run --project Maidas.WASM &
+dotnet run --project Midas.Api &
+dotnet run --project Midas.WASM &
 wait
