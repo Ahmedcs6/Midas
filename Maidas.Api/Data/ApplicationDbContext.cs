@@ -18,4 +18,5 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 	public DbSet<React> Reacts { get; set; }
 	public DbSet<Notification> Notifications { get; set; }
 	public DbSet<Follow> Follows { get; set; }
+	public DbSet<RefreshToken> RefreshTokens { get; set; }
 }

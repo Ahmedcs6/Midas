@@ -12,11 +12,6 @@ public class CustomUserValidator
 		UserManager<ApplicationUser> manager,
 		ApplicationUser user)
 	{
-		var result = await base.ValidateAsync(manager, user);
-
-		if (!result.Succeeded)
-			return result;
-
 		if (ReservedNames.Contains(
 			user.UserName!.ToLowerInvariant()))
 		{

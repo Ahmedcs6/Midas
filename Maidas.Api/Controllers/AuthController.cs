@@ -6,41 +6,28 @@ using Microsoft.AspNetCore.WebUtilities;
 namespace Maidas.Api.Controllers;
 
 [ApiController]
-[Route("[controller]")]
-public class AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IIdentityEmailService identityEmailService) : ControllerBase
+[Route("api/[controller]")]
+public class AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IIdentityEmailService identityEmailService, IAuthService authService, IEmailSender emailSender) : ControllerBase
 {
 	private readonly UserManager<ApplicationUser> _userManager = userManager;
 	private readonly SignInManager<ApplicationUser> _signInManager = signInManager;
 	private readonly IIdentityEmailService _identityEmailService = identityEmailService;
+	private readonly IAuthService _authService = authService;
+	private readonly IEmailSender _emailSender = emailSender;
 
 	[HttpPost("register")]
 	public async Task<IActionResult> Register([FromBody] RegisterDto model)
 	{
-		ApplicationUser user = new()
-		{
-			FirstName = model.FirstName,
-			LastName = model.LastName,
-			UserName = model.UserName,
-			Gender = model.Gender,
-			Email = model.Email
-		};
-		IdentityResult result = await _userManager.CreateAsync(user, model.Password);
+		var result = await _authService.RegisterAsync(model);
 		if (!result.Succeeded)
-		{
-			return BadRequest(result.Errors);
-		}
-		await _identityEmailService.SendConfirmationEmailAsync(user);
-		return Ok();
+			return BadRequest(result.Errors.ToList());
+		return Ok("Register Succeeded.");
 	}
 	[HttpPost("resend-confirm-email")]
 	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailDto model)
 	{
 		var user = await _userManager.FindByEmailAsync(model.Email);
-		if (user is null)
-		{
-			return Ok();
-		}
-		if (await _userManager.IsEmailConfirmedAsync(user))
+		if (user is null || await _userManager.IsEmailConfirmedAsync(user))
 		{
 			return Ok();
 		}
@@ -75,36 +62,18 @@ public class AuthController(UserManager<ApplicationUser> userManager, SignInMana
 	[HttpPost("login")]
 	public async Task<IActionResult> Login(LoginDto model)
 	{
-		var user = await _userManager.FindByEmailAsync(model.Email);
-
-		if (user is null)
-		{
-			return Unauthorized();
-		}
-
-		if (!await _userManager.IsEmailConfirmedAsync(user))
-		{
-			return BadRequest("Email is not confirmed.");
-		}
-
-		var result = await _signInManager.PasswordSignInAsync(
-			user,
-			model.Password,
-			isPersistent: false,
-			lockoutOnFailure: true);
-
+		var result = await _authService.LoginAsync(model);
 		if (!result.Succeeded)
 		{
-			return Unauthorized();
+			return BadRequest(result.Errors);
 		}
-
-		return Ok();
+		return Ok(result);
 	}
-	[HttpPost("logout")]
-	public async Task<IActionResult> Logout()
+	[HttpPost("refresh")]
+	public async Task<IActionResult> RefreshToken(RefreshTokenRequest model)
 	{
-		await _signInManager.SignOutAsync();
-		return Ok();
+		var result = await _authService.Refresh(model);
+		return Ok(result);
 	}
 	[Authorize]
 	[HttpDelete("account")]
