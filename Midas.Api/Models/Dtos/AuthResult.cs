@@ -4,7 +4,7 @@ namespace Midas.Api.Models.Dtos;
 
 public class AuthResult
 {
-	public IEnumerable<string> Errors { get; set; } = [];
+	public List<string> Errors { get; set; } = [];
 
 	public bool Succeeded { get; set; }
 

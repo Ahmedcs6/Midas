@@ -12,6 +12,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 		builder.ApplyConfiguration(new ReactEntityTypeConfiguration());
 		builder.ApplyConfiguration(new FollowEntityTypeConfiguration());
 		builder.ApplyConfiguration(new NotificationEntityTypeConfiguration());
+		builder.ApplyConfiguration(new RefreshTokenEntityTypeConfiguration());
 	}
 	public DbSet<Post> Posts { get; set; }
 	public DbSet<Comment> Comments { get; set; }

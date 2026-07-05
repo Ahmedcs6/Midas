@@ -21,7 +21,8 @@ public class AuthController(UserManager<ApplicationUser> userManager, SignInMana
 		var result = await _authService.RegisterAsync(model);
 		if (!result.Succeeded)
 			return BadRequest(result.Errors.ToList());
-		return Ok("Register Succeeded.");
+		await _identityEmailService.SendConfirmationEmailAsync(result.User);
+		return Ok("Register Succeeded, please confirm your email.");
 	}
 	[HttpPost("resend-confirm-email")]
 	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailDto model)
@@ -60,7 +61,7 @@ public class AuthController(UserManager<ApplicationUser> userManager, SignInMana
 		return Ok();
 	}
 	[HttpPost("login")]
-	public async Task<IActionResult> Login(LoginDto model)
+	public async Task<IActionResult> Login([FromBody] LoginDto model)
 	{
 		var result = await _authService.LoginAsync(model);
 		if (!result.Succeeded)
@@ -70,33 +71,12 @@ public class AuthController(UserManager<ApplicationUser> userManager, SignInMana
 		return Ok(result);
 	}
 	[HttpPost("refresh")]
-	public async Task<IActionResult> RefreshToken(RefreshTokenRequest model)
+	public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest model)
 	{
 		var result = await _authService.Refresh(model);
+		if (result.Succeeded == false)
+			return BadRequest(result);
 		return Ok(result);
-	}
-	[Authorize]
-	[HttpDelete("account")]
-	public async Task<IActionResult> Delete(DeleteAccountDto model)
-	{
-		var user = await _userManager.GetUserAsync(User);
-		if (user is null)
-			return Unauthorized();
-
-		bool validPassword =
-			await _userManager.CheckPasswordAsync(user, model.Password);
-
-		if (!validPassword)
-			return BadRequest("Invalid password.");
-
-		var result = await _userManager.DeleteAsync(user);
-
-		if (!result.Succeeded)
-			return BadRequest(result.Errors);
-
-		await _signInManager.SignOutAsync();
-
-		return NoContent();
 	}
 }
 

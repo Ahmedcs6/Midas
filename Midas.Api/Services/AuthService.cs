@@ -4,14 +4,13 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
-using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 namespace Midas.Api.Services;
 
-public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtSettings> jwt, ApplicationDbContext context, IEmailSender emailSender) : IAuthService
+public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtSettings> jwt, ApplicationDbContext context, IIdentityEmailService identityEmailService) : IAuthService
 {
 	private readonly UserManager<ApplicationUser> _userManager = userManager;
 	private readonly ApplicationDbContext _context = context;
-	private readonly IEmailSender _emailSender = emailSender;
+	private readonly IIdentityEmailService _identityEmailService = identityEmailService;
 	private readonly JwtSettings _jwt = jwt.Value;
 
 
@@ -28,9 +27,13 @@ public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtS
 		var result = await _userManager.CreateAsync(user, model.Password);
 		if (!result.Succeeded)
 		{
-			return new AuthResult { Succeeded = false, Errors = result.Errors.Select(e => e.Description) };
+			return new AuthResult { Succeeded = false, Errors = [.. result.Errors.Select(e => e.Description)] };
 		}
-		await _userManager.AddToRoleAsync(user, "User");
+		result = await _userManager.AddToRoleAsync(user, "User");
+		if (!result.Succeeded)
+		{
+			return new AuthResult { Succeeded = false, Errors = [.. result.Errors.Select(e => e.Description)] };
+		}
 		return new()
 		{
 			Succeeded = true
@@ -69,7 +72,6 @@ public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtS
 	public async Task<AuthResult> LoginAsync(LoginDto model)
 	{
 		var user = await _userManager.FindByEmailAsync(model.Email);
-
 		if (user is null || !await _userManager.CheckPasswordAsync(user, model.Password))
 		{
 			return new AuthResult { Succeeded = false, Errors = ["Invalid email or password."] };
@@ -79,15 +81,20 @@ public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtS
 		{
 			return new AuthResult { Succeeded = false, Errors = ["Please confirm your email."] };
 		}
+		await _context.RefreshTokens
+						.Where(t => t.ApplicationUserId == user.Id && t.Client == model.Client &&
+									t.RevokedAt == null)
+						.ExecuteUpdateAsync(setters =>
+							setters.SetProperty(
+								t => t.RevokedAt,
+								DateTime.UtcNow));
+
 		var token = await CreateJwtToken(user);
-		RefreshToken? refreshToken = user.RefreshTokens.FirstOrDefault(t => t.Client == model.Client && t.IsActive);
-		if (refreshToken is null)
-		{
-			refreshToken = GenerateRefreshToken();
-			refreshToken.Client = model.Client;
-			user.RefreshTokens.Add(refreshToken);
-		}
-		await _userManager.UpdateAsync(user);
+		var refreshToken = GenerateRefreshToken();
+		refreshToken.Client = model.Client;
+		refreshToken.ApplicationUserId = user.Id;
+		_context.RefreshTokens.Add(refreshToken);
+		await _context.SaveChangesAsync();
 		return new()
 		{
 			Succeeded = true,
@@ -110,54 +117,53 @@ public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtS
 	}
 	public async Task<AuthResult> Refresh(RefreshTokenRequest model)
 	{
+		var AuthResult = new AuthResult
+		{
+			Succeeded = true
+		};
 		var bytes = Convert.FromBase64String(model.RefreshToken);
 		var hash = Convert.ToBase64String(SHA256.HashData(bytes));
-		var oldRefreshToken = await _context.RefreshTokens.Include(t => t.User).ThenInclude(u => u.RefreshTokens).FirstOrDefaultAsync(t => t.TokenHash == hash);
+		var oldRefreshToken = await _context.RefreshTokens.Include(t => t.User).FirstOrDefaultAsync(t => t.TokenHash == hash);
 		if (oldRefreshToken is null)
 		{
-			return new()
-			{
-				Succeeded = false,
-				Errors = ["Invalid token."]
-			};
+			AuthResult.Succeeded = false;
+			AuthResult.Errors = ["Invalid token."];
+			return AuthResult;
 		}
 		if (oldRefreshToken.IsExpired)
 		{
-			return new()
-			{
-				Succeeded = false,
-				Errors = ["Expired token."]
-			};
+			AuthResult.Succeeded = false;
+			AuthResult.Errors.Add("Expired token.");
 		}
-		if (oldRefreshToken.RevokedAt is not null)
+		var rowsAffected = await _context.RefreshTokens
+			.Where(t => t.Id == oldRefreshToken.Id && t.RevokedAt == null)
+			.ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTime.UtcNow));
+		if (rowsAffected == 0)
 		{
-			foreach (var token in oldRefreshToken.User.RefreshTokens)
-			{
-				if (token.RevokedAt == null)
-				{
-					token.RevokedAt = DateTime.UtcNow;
-				}
-			}
-			await _context.SaveChangesAsync();
-			return new()
-			{
-				Succeeded = false,
-				Errors = ["Revoked token."]
-			};
+			await _context.RefreshTokens
+				.Where(t => t.ApplicationUserId == oldRefreshToken.ApplicationUserId &&
+							t.RevokedAt == null)
+				.ExecuteUpdateAsync(setters =>
+					setters.SetProperty(
+						t => t.RevokedAt,
+						DateTime.UtcNow));
+			await _identityEmailService.SecurityAlert(oldRefreshToken.User.Email);
+			AuthResult.Succeeded = false;
+			AuthResult.Errors.Add("Revoked token.");
+			return AuthResult;
 		}
+		if (!AuthResult.Succeeded)
+			return AuthResult;
 		RefreshToken newToken = GenerateRefreshToken();
 		newToken.Client = oldRefreshToken.Client;
-		oldRefreshToken.RevokedAt = DateTime.UtcNow;
-		oldRefreshToken.User.RefreshTokens.Add(newToken);
+		newToken.ApplicationUserId = oldRefreshToken.ApplicationUserId;
+		_context.RefreshTokens.Add(newToken);
 		await _context.SaveChangesAsync();
 		var AccessToken = await CreateJwtToken(oldRefreshToken.User);
-		return new()
-		{
-			Succeeded = true,
-			User = oldRefreshToken.User,
-			AccessToken = new JwtSecurityTokenHandler().WriteToken(AccessToken),
-			ExpiresOn = AccessToken.ValidTo,
-			RefreshToken = newToken
-		};
+		AuthResult.User = oldRefreshToken.User;
+		AuthResult.AccessToken = new JwtSecurityTokenHandler().WriteToken(AccessToken);
+		AuthResult.ExpiresOn = AccessToken.ValidTo;
+		AuthResult.RefreshToken = newToken;
+		return AuthResult;
 	}
 }

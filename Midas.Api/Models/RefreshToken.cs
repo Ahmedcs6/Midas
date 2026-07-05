@@ -3,7 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace Midas.Api.Models;
 
-[Owned]
 public class RefreshToken
 {
 	[JsonIgnore]
