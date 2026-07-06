@@ -36,7 +36,8 @@ public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtS
 		}
 		return new()
 		{
-			Succeeded = true
+			Succeeded = true,
+			User = user
 		};
 	}
 	public async Task<JwtSecurityToken> CreateJwtToken(ApplicationUser user)

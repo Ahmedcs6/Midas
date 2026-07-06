@@ -1,5 +1,4 @@
 using System.Text;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 
@@ -10,10 +9,8 @@ namespace Midas.Api.Controllers;
 public class AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IIdentityEmailService identityEmailService, IAuthService authService, IEmailSender emailSender) : ControllerBase
 {
 	private readonly UserManager<ApplicationUser> _userManager = userManager;
-	private readonly SignInManager<ApplicationUser> _signInManager = signInManager;
 	private readonly IIdentityEmailService _identityEmailService = identityEmailService;
 	private readonly IAuthService _authService = authService;
-	private readonly IEmailSender _emailSender = emailSender;
 
 	[HttpPost("register")]
 	public async Task<IActionResult> Register([FromBody] RegisterDto model)
