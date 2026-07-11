@@ -50,7 +50,6 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IEmailSender, EmailSender>();
-builder.Services.AddScoped<IIdentityEmailService, IdentityEmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddControllers();

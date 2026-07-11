@@ -1,15 +1,11 @@
-using System.Text;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.WebUtilities;
 
 namespace Midas.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IIdentityEmailService identityEmailService, IAuthService authService, IEmailSender emailSender) : ControllerBase
+public class AuthController(IAuthService authService) : ControllerBase
 {
-	private readonly UserManager<ApplicationUser> _userManager = userManager;
-	private readonly IIdentityEmailService _identityEmailService = identityEmailService;
 	private readonly IAuthService _authService = authService;
 
 	[HttpPost("register")]
@@ -18,44 +14,11 @@ public class AuthController(UserManager<ApplicationUser> userManager, SignInMana
 		var result = await _authService.RegisterAsync(model);
 		if (!result.Succeeded)
 			return BadRequest(result.Errors.ToList());
-		await _identityEmailService.SendConfirmationEmailAsync(result.User);
+		await _authService.SendConfirmEmailAsync(new()
+		{
+			Email = model.Email
+		});
 		return Ok("Register Succeeded, please confirm your email.");
-	}
-	[HttpPost("resend-confirm-email")]
-	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailDto model)
-	{
-		var user = await _userManager.FindByEmailAsync(model.Email);
-		if (user is null || await _userManager.IsEmailConfirmedAsync(user))
-		{
-			return Ok();
-		}
-		await _identityEmailService.SendConfirmationEmailAsync(user);
-		return Ok();
-	}
-	[HttpPost("confirm-email")]
-	public async Task<IActionResult> ConfirmEmail(
-	[FromQuery] string userId,
-	[FromQuery] string token)
-	{
-		var user = await _userManager.FindByIdAsync(userId);
-
-		if (user is null)
-		{
-			return BadRequest();
-		}
-
-		token = Encoding.UTF8.GetString(
-			WebEncoders.Base64UrlDecode(token));
-
-		var result =
-			await _userManager.ConfirmEmailAsync(user, token);
-
-		if (!result.Succeeded)
-		{
-			return BadRequest();
-		}
-
-		return Ok();
 	}
 	[HttpPost("login")]
 	public async Task<IActionResult> Login([FromBody] LoginDto model)
@@ -67,14 +30,46 @@ public class AuthController(UserManager<ApplicationUser> userManager, SignInMana
 		}
 		return Ok(result);
 	}
+	[HttpPost("resend-confirm-email")]
+	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailDto model)
+	{
+		await _authService.SendConfirmEmailAsync(model);
+		return Ok();
+	}
+	[HttpPost("confirm-email")]
+	public async Task<IActionResult> ConfirmEmail(
+	[FromQuery] string userId,
+	[FromQuery] string token)
+	{
+		var result = await _authService.ConfirmEmailAsync(userId, token);
+		if (!result.Succeeded)
+		{
+			return BadRequest(result.Errors);
+		}
+		return Ok();
+	}
 	[HttpPost("refresh")]
 	public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest model)
 	{
-		var result = await _authService.Refresh(model);
+		var result = await _authService.RefreshAsync(model);
 		if (result.Succeeded == false)
 			return BadRequest(result);
 		return Ok(result);
 	}
+	[HttpPost("forgot-password")]
+	public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto model)
+	{
+		var result = await _authService.ForgotPasswordAsync(model);
+		if (!result.Succeeded)
+			return BadRequest(result.Errors);
+		return Ok();
+	}
+	[HttpPost("reset-password")]
+	public async Task<IActionResult> ResetPassword(ResetPasswordDto model)
+	{
+		var result = await _authService.ResetPasswordAsync(model);
+		if (!result.Succeeded)
+			return BadRequest(result.Errors);
+		return Ok();
+	}
 }
-
-

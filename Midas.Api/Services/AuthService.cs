@@ -4,15 +4,15 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
+using Microsoft.AspNetCore.WebUtilities;
 namespace Midas.Api.Services;
 
-public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtSettings> jwt, ApplicationDbContext context, IIdentityEmailService identityEmailService) : IAuthService
+public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtSettings> jwt, ApplicationDbContext context, IEmailSender emailSender) : IAuthService
 {
 	private readonly UserManager<ApplicationUser> _userManager = userManager;
 	private readonly ApplicationDbContext _context = context;
-	private readonly IIdentityEmailService _identityEmailService = identityEmailService;
+	private readonly IEmailSender _emailSender = emailSender;
 	private readonly JwtSettings _jwt = jwt.Value;
-
 
 	public async Task<AuthResult> RegisterAsync(RegisterDto model)
 	{
@@ -40,7 +40,7 @@ public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtS
 			User = user
 		};
 	}
-	public async Task<JwtSecurityToken> CreateJwtToken(ApplicationUser user)
+	public async Task<JwtSecurityToken> CreateJwtTokenAsync(ApplicationUser user)
 	{
 		var userClaims = await _userManager.GetClaimsAsync(user);
 		var roles = await _userManager.GetRolesAsync(user);
@@ -90,7 +90,7 @@ public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtS
 								t => t.RevokedAt,
 								DateTime.UtcNow));
 
-		var token = await CreateJwtToken(user);
+		var token = await CreateJwtTokenAsync(user);
 		var refreshToken = GenerateRefreshToken();
 		refreshToken.Client = model.Client;
 		refreshToken.ApplicationUserId = user.Id;
@@ -116,7 +116,7 @@ public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtS
 		};
 		return token;
 	}
-	public async Task<AuthResult> Refresh(RefreshTokenRequest model)
+	public async Task<AuthResult> RefreshAsync(RefreshTokenRequest model)
 	{
 		var AuthResult = new AuthResult
 		{
@@ -148,7 +148,7 @@ public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtS
 					setters.SetProperty(
 						t => t.RevokedAt,
 						DateTime.UtcNow));
-			await _identityEmailService.SecurityAlert(oldRefreshToken.User.Email);
+			await _emailSender.SendSecurityAlertAsync(oldRefreshToken.User, oldRefreshToken.User.Email);
 			AuthResult.Succeeded = false;
 			AuthResult.Errors.Add("Revoked token.");
 			return AuthResult;
@@ -160,11 +160,117 @@ public class AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtS
 		newToken.ApplicationUserId = oldRefreshToken.ApplicationUserId;
 		_context.RefreshTokens.Add(newToken);
 		await _context.SaveChangesAsync();
-		var AccessToken = await CreateJwtToken(oldRefreshToken.User);
+		var AccessToken = await CreateJwtTokenAsync(oldRefreshToken.User);
 		AuthResult.User = oldRefreshToken.User;
 		AuthResult.AccessToken = new JwtSecurityTokenHandler().WriteToken(AccessToken);
 		AuthResult.ExpiresOn = AccessToken.ValidTo;
 		AuthResult.RefreshToken = newToken;
 		return AuthResult;
+	}
+	public async Task<AuthResult> ForgotPasswordAsync(ForgotPasswordDto model)
+	{
+		var user = await _userManager.FindByEmailAsync(model.Email);
+		if (user is null)
+		{
+			return new()
+			{
+				Succeeded = true
+			};
+		}
+		if (!await _userManager.IsEmailConfirmedAsync(user))
+			return new()
+			{
+				Succeeded = false,
+				Errors = ["Please confirm your Email."]
+			};
+		var token =
+			await _userManager.GeneratePasswordResetTokenAsync(user);
+
+		var encodedToken =
+			WebEncoders.Base64UrlEncode(
+				Encoding.UTF8.GetBytes(token));
+
+		var resetLink = $"https://localhost:7103/reset-password?userId={user.Id}&token={encodedToken}";
+		await _emailSender.SendPasswordResetLinkAsync(user, model.Email, resetLink);
+		return new()
+		{
+			Succeeded = true
+		};
+	}
+
+	public async Task SendConfirmEmailAsync(ConfirmEmailDto model)
+	{
+		var user = await _userManager.FindByEmailAsync(model.Email);
+		if (user is null || await _userManager.IsEmailConfirmedAsync(user))
+		{
+			return;
+		}
+		string token =
+			await _userManager.GenerateEmailConfirmationTokenAsync(user);
+		string encodedToken =
+	WebEncoders.Base64UrlEncode(
+		Encoding.UTF8.GetBytes(token));
+
+		string confirmationLink =
+			$"https://localhost:7103/confirm-email?userId={user.Id}&token={encodedToken}";
+		await _emailSender.SendConfirmationLinkAsync(user, model.Email, confirmationLink);
+	}
+	public async Task<AuthResult> ConfirmEmailAsync(string userId, string token)
+	{
+		var user = await _userManager.FindByIdAsync(userId);
+		if (user is null)
+		{
+			return new()
+			{
+				Succeeded = false,
+				Errors = ["user not found."]
+			};
+		}
+		token = Encoding.UTF8.GetString(
+			WebEncoders.Base64UrlDecode(token));
+
+		var result =
+			await _userManager.ConfirmEmailAsync(user, token);
+
+		if (!result.Succeeded)
+		{
+			return new()
+			{
+				Succeeded = false,
+				Errors = [.. result.Errors.Select(e => e.Description)]
+			};
+		}
+		return new()
+		{
+			Succeeded = true
+		};
+	}
+	public async Task<AuthResult> ResetPasswordAsync(ResetPasswordDto model)
+	{
+		var user = await _userManager.FindByIdAsync(model.Id);
+		if (user is null)
+		{
+			return new()
+			{
+				Succeeded = false,
+				Errors = ["user not found."]
+			};
+		}
+		var token = Encoding.UTF8.GetString(
+			WebEncoders.Base64UrlDecode(model.Token));
+		var result =
+			await _userManager.ResetPasswordAsync(user, token, model.NewPassword);
+		if (!result.Succeeded)
+		{
+			return new()
+			{
+				Succeeded = false,
+				Errors = [.. result.Errors.Select(e => e.Description)]
+			};
+		}
+		return new()
+		{
+			Succeeded = true
+		};
 	}
 }
