@@ -50,8 +50,8 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IEmailSender, EmailSender>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-
+builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddControllers();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

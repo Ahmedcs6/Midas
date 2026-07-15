@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 namespace Midas.Api.Models;
 
-public partial class ApplicationUser : IdentityUser
+public class ApplicationUser : IdentityUser
 {
 	public string FirstName { get; set; } = null!;
 
@@ -12,7 +12,7 @@ public partial class ApplicationUser : IdentityUser
 
 	public DateOnly? BirthDate { get; set; }
 
-	public GenderType? Gender { get; set; }
+	public GenderType Gender { get; set; }
 
 	public string? About { get; set; }
 

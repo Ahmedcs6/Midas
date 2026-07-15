@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Midas.Api.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class UsersController(UserManager<ApplicationUser> userManager) : ControllerBase
 {
 	private readonly UserManager<ApplicationUser> _userManager = userManager;
