@@ -1,41 +1,59 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Midas.Api.Helpers.Responses;
 
 namespace Midas.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(IAccountService accountService, IJwtService jwtService) : ControllerBase
+public class AuthController(IAccountService accountService, IJwtService jwtService, IServiceScopeFactory scopeFactory) : ControllerBase
 {
 	private readonly IAccountService _accountService = accountService;
 	private readonly IJwtService _jwtService = jwtService;
+	private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
 
 	[HttpPost("register")]
 	public async Task<IActionResult> Register([FromBody] RegisterDto model)
 	{
+		var sw = Stopwatch.StartNew();
 		var result = await _accountService.RegisterAsync(model);
+		Console.WriteLine($"Register: {sw.ElapsedMilliseconds} ms");
 		if (!result.Succeeded)
-			return BadRequest(result.Errors.ToList());
-		await _accountService.SendConfirmEmailAsync(new()
+			return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail<object>("Register Error", result.Errors));
+		sw.Restart();
+		_ = Task.Run(async () =>
 		{
-			Email = model.Email
+			using var scope = _scopeFactory.CreateScope();
+			var accountService = scope.ServiceProvider.GetRequiredService<IAccountService>();
+			await accountService.SendConfirmEmailAsync(new() { Email = model.Email });
 		});
-		return Ok("Register Succeeded, please confirm your email.");
+		Console.WriteLine($"Send Email: {sw.ElapsedMilliseconds} ms");
+		return StatusCode(StatusCodes.Status201Created, ResponseHelper.Success(result.User, "Register Succeeded, please confirm your email."));
 	}
 	[HttpPost("login")]
 	public async Task<IActionResult> Login([FromBody] LoginDto model)
 	{
+		var sw = Stopwatch.StartNew();
 		var result = await _accountService.LoginAsync(model);
 		if (!result.Succeeded)
 		{
-			return BadRequest(result.Errors);
+			if (result.Errors.Contains("Please confirm your email."))
+			{
+				return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail<object>("Please confirm your email.", result.Errors));
+			}
+			if (result.Errors.Contains("Invalid email or password."))
+			{
+				return Unauthorized(ResponseHelper.Fail<object>("Invalid email or password.", result.Errors));
+			}
 		}
-		return Ok(result);
+		Console.WriteLine($"Login: {sw.ElapsedMilliseconds} ms");
+		return Ok(ResponseHelper.Success(result.RefreshTokenResponse, "Login Succeeded."));
 	}
 	[HttpPost("resend-confirm-email")]
 	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailDto model)
 	{
 		await _accountService.SendConfirmEmailAsync(model);
-		return Ok();
+		return Ok(ResponseHelper.Success(new { }));
 	}
 	[HttpPost("confirm-email")]
 	public async Task<IActionResult> ConfirmEmail(
@@ -45,17 +63,17 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 		var result = await _accountService.ConfirmEmailAsync(userId, token);
 		if (!result.Succeeded)
 		{
-			return BadRequest(result.Errors);
+			return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail<object>("Invalid data.", result.Errors));
 		}
-		return Ok();
+		return Ok(ResponseHelper.Success<object>(new { }));
 	}
 	[HttpPost("refresh")]
 	public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest model)
 	{
 		var result = await _jwtService.RefreshAsync(model);
-		if (result.Succeeded == false)
-			return BadRequest(result);
-		return Ok(result);
+		if (!result.Succeeded)
+			return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail<object>("Invalid data.", result.Errors));
+		return Ok(ResponseHelper.Success(result.RefreshTokenResponse));
 	}
 	[HttpPost("forgot-password")]
 	public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto model)

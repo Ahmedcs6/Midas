@@ -6,7 +6,7 @@ namespace Midas.Api.Middlewares;
 
 public class GlobalExceptionHandlingMiddleware(ILogger<GlobalExceptionHandlingMiddleware> logger) : IMiddleware
 {
-	private readonly ILogger _logger = logger;
+	private readonly ILogger<GlobalExceptionHandlingMiddleware> _logger = logger;
 
 	public async Task InvokeAsync(HttpContext context, RequestDelegate next)
 	{
@@ -16,16 +16,20 @@ public class GlobalExceptionHandlingMiddleware(ILogger<GlobalExceptionHandlingMi
 		}
 		catch (Exception e)
 		{
-			_logger.LogError(e, e.Message);
+			_logger.LogError(
+				e,
+				"Unhandled exception while processing {Method} {Path}",
+				context.Request.Method,
+				context.Request.Path);
 			context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
 			ProblemDetails problem = new()
 			{
-				Status = (int)HttpStatusCode.InternalServerError,
-				Type = "Server error",
-				Title = "Server error",
-				Detail = "An internal Server Error has occured"
-
+				Status = 500,
+				Title = "Internal Server Error",
+				Type = "https://httpstatuses.com/500",
+				Detail = "An unexpected error occurred.",
+				Instance = context.Request.Path
 			};
 			string json = JsonSerializer.Serialize(problem);
 			context.Response.ContentType = "application/json";

@@ -24,7 +24,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 	options.User.RequireUniqueEmail = true;
 	options.SignIn.RequireConfirmedEmail = true;
 })
-	.AddUserValidator<CustomUserValidator>()
+	// .AddUserValidator<CustomUserValidator>()
 	.AddEntityFrameworkStores<ApplicationDbContext>()
 	.AddDefaultTokenProviders();
 
@@ -54,7 +54,6 @@ builder.Services.AddScoped<IEmailSender, EmailSender>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddControllers();
-
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 

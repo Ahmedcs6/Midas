@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 
 namespace Midas.Api.Models.Dtos;
 
@@ -8,12 +7,7 @@ public class AuthResult
 
 	public bool Succeeded { get; set; }
 
-	[JsonIgnore]
-	public ApplicationUser User { get; set; } = new();
+	public UserDto? User { get; set; }
 
-	public string AccessToken { get; set; } = "";
-
-	public DateTime ExpiresOn { get; set; }
-
-	public RefreshToken? RefreshToken { get; set; } = new();
+	public RefreshTokenResponse? RefreshTokenResponse { get; set; }
 }

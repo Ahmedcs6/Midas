@@ -5,6 +5,6 @@ namespace Midas.Api.Interfaces;
 public interface IJwtService
 {
 	Task<JwtSecurityToken> CreateJwtTokenAsync(ApplicationUser user);
-	RefreshToken GenerateRefreshToken();
+	byte[] GenerateRefreshToken();
 	Task<AuthResult> RefreshAsync(RefreshTokenRequest model);
 }

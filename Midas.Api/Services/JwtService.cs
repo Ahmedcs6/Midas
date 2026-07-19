@@ -45,16 +45,16 @@ public class JwtService(UserManager<ApplicationUser> userManager, IOptions<JwtSe
 		return jwtSecurityToken;
 	}
 
-	public RefreshToken GenerateRefreshToken()
+	public byte[] GenerateRefreshToken()
 	{
 		var bytes = RandomNumberGenerator.GetBytes(64);
-		var token = new RefreshToken
-		{
-			Token = Convert.ToBase64String(bytes),
-			TokenHash = Convert.ToBase64String(SHA256.HashData(bytes)),
-			ExpiresAt = DateTime.UtcNow.AddDays(30)
-		};
-		return token;
+		// var token = new RefreshToken
+		// {
+		// 	Token = Convert.ToBase64String(bytes),
+		// 	TokenHash = Convert.ToBase64String(SHA256.HashData(bytes)),
+		// 	ExpiresAt = DateTime.UtcNow.AddDays(30)
+		// };
+		return bytes;
 	}
 
 	public async Task<AuthResult> RefreshAsync(RefreshTokenRequest model)
@@ -72,6 +72,7 @@ public class JwtService(UserManager<ApplicationUser> userManager, IOptions<JwtSe
 			AuthResult.Errors = ["Invalid token."];
 			return AuthResult;
 		}
+		ApplicationUser user = oldRefreshToken.User!;
 		if (oldRefreshToken.IsExpired)
 		{
 			AuthResult.Succeeded = false;
@@ -89,23 +90,38 @@ public class JwtService(UserManager<ApplicationUser> userManager, IOptions<JwtSe
 					setters.SetProperty(
 						t => t.RevokedAt,
 						DateTime.UtcNow));
-			await _emailSender.SendSecurityAlertAsync(oldRefreshToken.User, oldRefreshToken.User.Email);
+			await _emailSender.SendSecurityAlertAsync(user, user.Email!);
 			AuthResult.Succeeded = false;
 			AuthResult.Errors.Add("Revoked token.");
 			return AuthResult;
 		}
 		if (!AuthResult.Succeeded)
 			return AuthResult;
-		RefreshToken newToken = GenerateRefreshToken();
-		newToken.Client = oldRefreshToken.Client;
-		newToken.ApplicationUserId = oldRefreshToken.ApplicationUserId;
+		bytes = GenerateRefreshToken();
+		RefreshToken newToken = new()
+		{
+			TokenHash = Convert.ToBase64String(SHA256.HashData(bytes)),
+			ExpiresAt = DateTime.UtcNow.AddDays(30),
+			Client = oldRefreshToken.Client,
+			ApplicationUserId = oldRefreshToken.ApplicationUserId
+		};
 		_context.RefreshTokens.Add(newToken);
 		await _context.SaveChangesAsync();
-		var AccessToken = await CreateJwtTokenAsync(oldRefreshToken.User);
-		AuthResult.User = oldRefreshToken.User;
-		AuthResult.AccessToken = new JwtSecurityTokenHandler().WriteToken(AccessToken);
-		AuthResult.ExpiresOn = AccessToken.ValidTo;
-		AuthResult.RefreshToken = newToken;
+		var AccessToken = await CreateJwtTokenAsync(user);
+		AuthResult.User = new()
+		{
+			FirstName = user.FirstName,
+			LastName = user.LastName,
+			UserName = user.UserName!,
+			Gender = user.Gender
+		};
+		AuthResult.RefreshTokenResponse = new()
+		{
+			AccessToken = new JwtSecurityTokenHandler().WriteToken(AccessToken),
+			AccessTokenExpiresAt = AccessToken.ValidTo,
+			RefreshToken = Convert.ToBase64String(bytes),
+			RefreshTokenExpiresAt = newToken.ExpiresAt
+		};
 		return AuthResult;
 	}
 }

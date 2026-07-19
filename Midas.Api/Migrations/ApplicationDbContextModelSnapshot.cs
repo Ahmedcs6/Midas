@@ -185,7 +185,7 @@ namespace Midas.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<int?>("Gender")
+                    b.Property<int>("Gender")
                         .HasColumnType("int");
 
                     b.Property<string>("ImageUrl")

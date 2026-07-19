@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.WebUtilities;
 
@@ -22,6 +24,7 @@ public class AccountService(UserManager<ApplicationUser> userManager, Applicatio
 			Email = model.Email
 		};
 		var result = await _userManager.CreateAsync(user, model.Password);
+
 		if (!result.Succeeded)
 		{
 			return new AuthResult { Succeeded = false, Errors = [.. result.Errors.Select(e => e.Description)] };
@@ -34,7 +37,13 @@ public class AccountService(UserManager<ApplicationUser> userManager, Applicatio
 		return new()
 		{
 			Succeeded = true,
-			User = user
+			User = new()
+			{
+				FirstName = user.FirstName,
+				LastName = user.LastName,
+				UserName = user.UserName,
+				Gender = user.Gender
+			}
 		};
 	}
 	public async Task<AuthResult> LoginAsync(LoginDto model)
@@ -58,18 +67,33 @@ public class AccountService(UserManager<ApplicationUser> userManager, Applicatio
 								DateTime.UtcNow));
 
 		var token = await _jwtService.CreateJwtTokenAsync(user);
-		var refreshToken = _jwtService.GenerateRefreshToken();
-		refreshToken.Client = model.Client;
-		refreshToken.ApplicationUserId = user.Id;
+		var bytes = _jwtService.GenerateRefreshToken();
+		var refreshToken = new RefreshToken
+		{
+			TokenHash = Convert.ToBase64String(SHA256.HashData(bytes)),
+			ExpiresAt = DateTime.UtcNow.AddDays(30),
+			Client = model.Client,
+			ApplicationUserId = user.Id
+		};
 		_context.RefreshTokens.Add(refreshToken);
 		await _context.SaveChangesAsync();
 		return new()
 		{
 			Succeeded = true,
-			User = user,
-			AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
-			ExpiresOn = token.ValidTo,
-			RefreshToken = refreshToken
+			User = new()
+			{
+				FirstName = user.FirstName,
+				LastName = user.LastName,
+				UserName = user.UserName!,
+				Gender = user.Gender
+			},
+			RefreshTokenResponse = new()
+			{
+				AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
+				AccessTokenExpiresAt = token.ValidTo,
+				RefreshToken = Convert.ToBase64String(bytes),
+				RefreshTokenExpiresAt = refreshToken.ExpiresAt
+			}
 		};
 	}
 	public async Task<AuthResult> ForgotPasswordAsync(ForgotPasswordDto model)

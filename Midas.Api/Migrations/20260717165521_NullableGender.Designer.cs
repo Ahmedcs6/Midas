@@ -12,8 +12,8 @@ using Midas.Api.Data;
 namespace Midas.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260705010055_token hash index")]
-    partial class tokenhashindex
+    [Migration("20260717165521_NullableGender")]
+    partial class NullableGender
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -188,7 +188,7 @@ namespace Midas.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<int?>("Gender")
+                    b.Property<int>("Gender")
                         .HasColumnType("int");
 
                     b.Property<string>("ImageUrl")

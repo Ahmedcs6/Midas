@@ -24,8 +24,6 @@ public class RefreshTokenEntityTypeConfiguration : IEntityTypeConfiguration<Refr
 			.HasForeignKey(r => r.ApplicationUserId)
 			.OnDelete(DeleteBehavior.Cascade);
 
-		builder.Ignore(r => r.Token);
-
 		builder.Ignore(r => r.IsExpired);
 
 		builder.Ignore(r => r.IsActive);
