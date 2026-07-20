@@ -47,7 +47,7 @@ builder.Services.AddAuthentication(options =>
 			ClockSkew = TimeSpan.Zero
 		};
 	});
-
+builder.Services.AddHttpLogging();
 builder.Services.AddAuthorization();
 builder.Services.AddTransient<GlobalExceptionHandlingMiddleware>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
@@ -58,6 +58,8 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+app.UseHttpLogging();
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 if (app.Environment.IsDevelopment())

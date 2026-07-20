@@ -52,7 +52,12 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 	[HttpPost("resend-confirm-email")]
 	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailDto model)
 	{
-		await _accountService.SendConfirmEmailAsync(model);
+		_ = Task.Run(async () =>
+		{
+			using var scope = _scopeFactory.CreateScope();
+			var accountService = scope.ServiceProvider.GetRequiredService<IAccountService>();
+			await accountService.SendConfirmEmailAsync(new() { Email = model.Email });
+		});
 		return Ok(ResponseHelper.Success(new { }));
 	}
 	[HttpPost("confirm-email")]
