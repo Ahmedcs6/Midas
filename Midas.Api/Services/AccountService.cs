@@ -3,6 +3,9 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore.Storage;
+using MimeKit.Encodings;
+using Org.BouncyCastle.Crypto.Modes;
 
 namespace Midas.Api.Services;
 
@@ -16,6 +19,8 @@ public class AccountService(ILogger<AccountService> logger, UserManager<Applicat
 
 	public async Task<AuthResult> RegisterAsync(RegisterDto model)
 	{
+		await using var transaction =
+			await _context.Database.BeginTransactionAsync();
 		ApplicationUser user = new()
 		{
 			FirstName = model.FirstName,
@@ -34,7 +39,6 @@ public class AccountService(ILogger<AccountService> logger, UserManager<Applicat
 							string.Join(", ", result.Errors.Select(e => e.Description)));
 			return new AuthResult { Succeeded = false, Errors = [.. result.Errors.Select(e => e.Description)] };
 		}
-		_logger.LogInformation("User registered: {UserId} ({Email})", user.Id, user.Email);
 		result = await _userManager.AddToRoleAsync(user, "User");
 		if (!result.Succeeded)
 		{
@@ -44,6 +48,8 @@ public class AccountService(ILogger<AccountService> logger, UserManager<Applicat
 						  string.Join(", ", result.Errors.Select(e => e.Description)));
 			return new AuthResult { Succeeded = false, Errors = [.. result.Errors.Select(e => e.Description)] };
 		}
+		await transaction.CommitAsync();
+		_logger.LogInformation("User registered: {UserId} ({Email})", user.Id, user.Email);
 		return new()
 		{
 			Succeeded = true,
