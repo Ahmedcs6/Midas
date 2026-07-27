@@ -1,0 +1,84 @@
+.
+├── Midas.Api
+│   ├── Configuration
+│   │   ├── ApplicationUserEntityTypeConfiguration.cs
+│   │   ├── CommentEntityTypeConfiguration.cs
+│   │   ├── FollowEntityTypeConfiguration.cs
+│   │   ├── NotificationEntityTypeConfiguration.cs
+│   │   ├── PostEntityTypeConfiguration.cs
+│   │   ├── ReactEntityTypeConfiguration.cs
+│   │   └── RefreshTokenEntityTypeConfiguration.cs
+│   ├── Controllers
+│   │   ├── AuthController.cs
+│   │   └── UsersController.cs
+│   ├── Data
+│   │   ├── ApplicationDbContext.cs
+│   │   └── Enum
+│   │       ├── Client.cs
+│   │       ├── Gender.cs
+│   │       └── Privacy.cs
+│   ├── GlobalUsings.cs
+│   ├── Helpers
+│   │   ├── EmailSettings.cs
+│   │   ├── JwtSettings.cs
+│   │   └── Responses
+│   │       ├── ApiResponse.cs
+│   │       └── ResponseHelper.cs
+│   ├── Interfaces
+│   │   ├── IAccountService.cs
+│   │   ├── IEmailSender.cs
+│   │   └── IJwtService.cs
+│   ├── Midas.Api.csproj
+│   ├── Middlewares
+│   │   └── GlobalExceptionHandlingMiddleware.cs
+│   ├── Migrations
+│   │   ├── 20260624191113_InitialCreate.Designer.cs
+│   │   ├── 20260624191113_InitialCreate.cs
+│   │   ├── 20260628001057_SeedRoles.Designer.cs
+│   │   ├── 20260628001057_SeedRoles.cs
+│   │   ├── 20260701200533_AddRefreshTokensTable.Designer.cs
+│   │   ├── 20260701200533_AddRefreshTokensTable.cs
+│   │   ├── 20260703141437_AddClientType.Designer.cs
+│   │   ├── 20260703141437_AddClientType.cs
+│   │   ├── 20260705010055_TokenHashIndex.Designer.cs
+│   │   ├── 20260705010055_TokenHashIndex.cs
+│   │   ├── 20260717165521_NullableGender.Designer.cs
+│   │   ├── 20260717165521_NullableGender.cs
+│   │   └── ApplicationDbContextModelSnapshot.cs
+│   ├── Models
+│   │   ├── Address.cs
+│   │   ├── ApplicationUser.cs
+│   │   ├── Comment.cs
+│   │   ├── Dtos
+│   │   │   ├── AuthResult.cs
+│   │   │   ├── ConfirmEmailDto.cs
+│   │   │   ├── DeleteAccountDto.cs
+│   │   │   ├── EditUserDto.cs
+│   │   │   ├── ForgotPassword.cs
+│   │   │   ├── LoginDto.cs
+│   │   │   ├── LogoutDto.cs
+│   │   │   ├── RefreshTokenRequest.cs
+│   │   │   ├── RefreshTokenResponse.cs
+│   │   │   ├── RegisterDto.cs
+│   │   │   ├── ResetPasswordDto.cs
+│   │   │   └── UserDto.cs
+│   │   ├── Follow.cs
+│   │   ├── Notification.cs
+│   │   ├── Post.cs
+│   │   ├── React.cs
+│   │   └── RefreshToken.cs
+│   ├── Program.cs
+│   ├── Properties
+│   │   └── launchSettings.json
+│   ├── Services
+│   │   ├── AccountService.cs
+│   │   ├── CustomUserValidator.cs
+│   │   ├── EmailSender.cs
+│   │   └── JwtService.cs
+│   ├── appsettings.Development.json
+│   └── appsettings.json
+├── Midas.slnx
+├── kill.sh
+├── log.txt
+└── run.sh
+

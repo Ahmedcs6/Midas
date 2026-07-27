@@ -1,11 +1,7 @@
-using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.EntityFrameworkCore.Storage;
-using MimeKit.Encodings;
-using Org.BouncyCastle.Crypto.Modes;
 
 namespace Midas.Api.Services;
 

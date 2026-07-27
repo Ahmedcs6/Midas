@@ -15,12 +15,9 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 	[HttpPost("register")]
 	public async Task<IActionResult> Register([FromBody] RegisterDto model)
 	{
-		var sw = Stopwatch.StartNew();
 		var result = await _accountService.RegisterAsync(model);
-		Console.WriteLine($"Register: {sw.ElapsedMilliseconds} ms");
 		if (!result.Succeeded)
 			return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail<object>("Register Error", result.Errors));
-		sw.Restart();
 		_ = Task.Run(async () =>
 		{
 			using var scope = _scopeFactory.CreateScope();

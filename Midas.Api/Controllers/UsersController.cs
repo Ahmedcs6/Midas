@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Midas.Api.Controllers;
@@ -9,6 +11,7 @@ public class UsersController(UserManager<ApplicationUser> userManager) : Control
 	private readonly UserManager<ApplicationUser> _userManager = userManager;
 
 	[HttpGet("{userName}")]
+	[Authorize]
 	public async Task<IActionResult> GetUser(string userName)
 	{
 		ApplicationUser? user = null;
