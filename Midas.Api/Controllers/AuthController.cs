@@ -24,7 +24,6 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 			var accountService = scope.ServiceProvider.GetRequiredService<IAccountService>();
 			await accountService.SendConfirmEmailAsync(new() { Email = model.Email });
 		});
-		Console.WriteLine($"Send Email: {sw.ElapsedMilliseconds} ms");
 		return StatusCode(StatusCodes.Status201Created, ResponseHelper.Success(result.User, "Register Succeeded, please confirm your email."));
 	}
 	[HttpPost("login")]
