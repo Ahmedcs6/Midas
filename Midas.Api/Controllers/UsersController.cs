@@ -1,6 +1,5 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Midas.Api.Helpers.Responses;
 
 namespace Midas.Api.Controllers;
 
@@ -11,24 +10,12 @@ public class UsersController(UserManager<ApplicationUser> userManager) : Control
 	private readonly UserManager<ApplicationUser> _userManager = userManager;
 
 	[HttpGet("{userName}")]
-	[Authorize]
 	public async Task<IActionResult> GetUser(string userName)
 	{
-		ApplicationUser? user = null;
-		if (userName == "me")
-		{
-			var me = await _userManager.GetUserAsync(User);
-			if (me is null)
-			{
-				return BadRequest("You are logged out.");
-			}
-			else
-				user = me;
-		}
-		user ??= await _userManager.FindByNameAsync(userName);
+		ApplicationUser? user = await _userManager.FindByNameAsync(userName);
 		if (user is null)
-			return BadRequest("User not found.");
-		UserDto response = new()
+			return BadRequest(ResponseHelper.Fail("User not found."));
+		UserResponse response = new()
 		{
 			FirstName = user.FirstName,
 			LastName = user.LastName,

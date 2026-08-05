@@ -9,7 +9,7 @@ public static class ResponseHelper
 		return new(true, message, data);
 	}
 
-	public static ApiResponse<T> Fail<T>(
+	public static ApiResponse<object> Fail(
 		string message,
 		List<string>? errors = null)
 	{

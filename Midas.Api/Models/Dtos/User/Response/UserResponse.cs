@@ -1,6 +1,6 @@
-namespace Midas.Api.Models.Dtos;
+namespace Midas.Api.Models.Dtos.User.Response;
 
-public partial class UserDto
+public class UserResponse
 {
 	public string FirstName { get; set; } = string.Empty;
 

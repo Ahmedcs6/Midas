@@ -1,4 +1,4 @@
-namespace Midas.Api.Models.Dtos;
+namespace Midas.Api.Models.Dtos.Auth.Request;
 
 public class RefreshTokenRequest
 {

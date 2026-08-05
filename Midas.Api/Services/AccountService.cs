@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace Midas.Api.Services;
@@ -13,7 +12,7 @@ public class AccountService(ILogger<AccountService> logger, UserManager<Applicat
 	private readonly IEmailSender _emailSender = emailSender;
 	private readonly IJwtService _jwtService = jwtService;
 
-	public async Task<AuthResult> RegisterAsync(RegisterDto model)
+	public async Task<AuthResult> RegisterAsync(RegisterRequest model)
 	{
 		await using var transaction =
 			await _context.Database.BeginTransactionAsync();
@@ -58,7 +57,7 @@ public class AccountService(ILogger<AccountService> logger, UserManager<Applicat
 			}
 		};
 	}
-	public async Task<AuthResult> LoginAsync(LoginDto model)
+	public async Task<AuthResult> LoginAsync(LoginRequest model)
 	{
 		var user = await _userManager.FindByEmailAsync(model.Email);
 		if (user is not null && !await _userManager.IsEmailConfirmedAsync(user))
@@ -112,7 +111,7 @@ public class AccountService(ILogger<AccountService> logger, UserManager<Applicat
 			}
 		};
 	}
-	public async Task<AuthResult> ForgotPasswordAsync(ForgotPasswordDto model)
+	public async Task<AuthResult> ForgotPasswordAsync(ForgotPasswordRequest model)
 	{
 		var user = await _userManager.FindByEmailAsync(model.Email);
 		if (user is null)
@@ -147,7 +146,7 @@ public class AccountService(ILogger<AccountService> logger, UserManager<Applicat
 			Succeeded = true
 		};
 	}
-	public async Task SendConfirmEmailAsync(ConfirmEmailDto model)
+	public async Task SendConfirmEmailAsync(ConfirmEmailRequset model)
 	{
 		var user = await _userManager.FindByEmailAsync(model.Email);
 		if (user is null || await _userManager.IsEmailConfirmedAsync(user))
@@ -202,7 +201,7 @@ public class AccountService(ILogger<AccountService> logger, UserManager<Applicat
 			Succeeded = true
 		};
 	}
-	public async Task<AuthResult> ResetPasswordAsync(ResetPasswordDto model)
+	public async Task<AuthResult> ResetPasswordAsync(ResetPasswordRequest model)
 	{
 		var user = await _userManager.FindByIdAsync(model.Id);
 		if (user is null)

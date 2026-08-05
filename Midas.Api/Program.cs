@@ -1,5 +1,7 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Midas.Api.Middlewares;
 
@@ -24,7 +26,6 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 	options.User.RequireUniqueEmail = true;
 	options.SignIn.RequireConfirmedEmail = true;
 })
-	.AddUserValidator<CustomUserValidator>()
 	.AddEntityFrameworkStores<ApplicationDbContext>()
 	.AddDefaultTokenProviders();
 

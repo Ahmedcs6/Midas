@@ -3,7 +3,6 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
 		<AllowMissingPrunePackageData>True</AllowMissingPrunePackageData>
     <UserSecretsId>0ac07dc2-9fd8-4518-ae64-d671f2f6d31f</UserSecretsId>
   </PropertyGroup>
