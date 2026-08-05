@@ -1,6 +1,6 @@
-namespace Midas.Api.Models.Dtos;
+namespace Midas.Api.Models.Dtos.User.Request;
 
-public partial class EditUser
+public class EditUserRequest
 {
 	public string FirstName { get; set; } = null!;
 
@@ -11,6 +11,4 @@ public partial class EditUser
 	public string? About { get; set; }
 
 	public Address Address { get; set; } = new();
-
-	public string? ImageUrl { get; set; }
 }

@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Midas.Api.Helpers.Responses;
+using Midas.Api.Models.Dtos.User.Request;
 
 namespace Midas.Api.Controllers;
 
@@ -26,6 +28,20 @@ public class UsersController(UserManager<ApplicationUser> userManager) : Control
 			BirthDate = user.BirthDate,
 			ImageUrl = user.ImageUrl
 		};
-		return Ok(response);
+		return Ok(ResponseHelper.Success(response));
+	}
+	[HttpPut("me")]
+	[Authorize]
+	public async Task<IActionResult> Edit([FromBody] EditUserRequest model)
+	{
+		var me = await _userManager.GetUserAsync(User);
+		if (me is null) return Unauthorized();
+		me.FirstName = model.FirstName;
+		me.LastName = model.LastName;
+		me.About = model.About;
+		me.Address = model.Address;
+		me.BirthDate = model.BirthDate;
+		await _userManager.UpdateAsync(me);
+		return Ok(ResponseHelper.Success<object>(new { }));
 	}
 }
