@@ -15,6 +15,7 @@ global using Midas.Api.Models;
 global using Midas.Api.Models.Dtos;
 global using Midas.Api.Models.Dtos.Auth.Request;
 global using Midas.Api.Models.Dtos.Auth.Response;
+global using Midas.Api.Models.Dtos.User.Request;
 global using Midas.Api.Models.Dtos.User.Response;
 
 global using Midas.Api.Configuration;

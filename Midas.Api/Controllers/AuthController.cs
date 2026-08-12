@@ -82,7 +82,7 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 		return Ok();
 	}
 	[HttpPost("reset-password")]
-	public async Task<IActionResult> ResetPassword(ResetPasswordRequest model)
+	public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest model)
 	{
 		var result = await _accountService.ResetPasswordAsync(model);
 		if (!result.Succeeded)
