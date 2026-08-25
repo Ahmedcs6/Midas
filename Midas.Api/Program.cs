@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -50,6 +51,16 @@ builder.Services.AddAuthentication(options =>
 	});
 builder.Services.AddHttpLogging();
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton(
+	Channel.CreateBounded<IEmailJob>(
+		new BoundedChannelOptions(100)
+		{
+			FullMode = BoundedChannelFullMode.Wait,
+			SingleReader = true,
+			SingleWriter = false
+		})
+);
+builder.Services.AddHostedService<EmailWorker>();
 builder.Services.AddTransient<GlobalExceptionHandlingMiddleware>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
 builder.Services.AddScoped<IJwtService, JwtService>();
@@ -71,8 +82,9 @@ if (app.Environment.IsDevelopment())
 	app.MapOpenApi();
 	app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "Swagger"));
 }
-app.UseHttpsRedirection();
-app.UseStaticFiles();
+// app.UseHttpsRedirection();
+// app.UseStaticFiles();
+app.MapStaticAssets();
 app.UseAuthentication();
 app.UseAuthorization();
 

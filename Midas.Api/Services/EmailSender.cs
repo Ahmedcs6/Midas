@@ -2,13 +2,14 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
 using Microsoft.Extensions.Options;
+using System.Threading;
 namespace Midas.Api.Services;
 
 public class EmailSender(IOptions<EmailSettings> options) : IEmailSender
 {
 	private readonly EmailSettings _settings = options.Value;
 
-	public async Task SendEmailAsync(string email, string subject, string htmlMessage)
+	private async Task SendEmailAsync(string email, string subject, string htmlMessage, CancellationToken cancellationToken)
 	{
 		var message = new MimeMessage();
 
@@ -25,26 +26,26 @@ public class EmailSender(IOptions<EmailSettings> options) : IEmailSender
 
 		using var client = new SmtpClient();
 
-		await client.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.StartTls);
+		await client.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.StartTls, cancellationToken);
 
-		await client.AuthenticateAsync(_settings.Username, _settings.Password);
+		await client.AuthenticateAsync(_settings.Username, _settings.Password, cancellationToken);
 
-		await client.SendAsync(message);
+		await client.SendAsync(message, cancellationToken);
 
-		await client.DisconnectAsync(true);
+		await client.DisconnectAsync(true, cancellationToken);
 	}
-	public async Task SendConfirmationLinkAsync(ApplicationUser user, string email, string confirmationLink)
+	private async Task SendConfirmationLinkAsync(ConfirmEmailJob job, CancellationToken cancellationToken)
 	{
 		string htmlMessage =
 		$"""
-    <h2>Welcome to Midas, {user.FirstName}!</h2>
+    <h2>Welcome to Midas, {job.User.FirstName}!</h2>
 
     <p>Thanks for creating an account.</p>
 
     <p>Please confirm your email by clicking the button below:</p>
 
     <p>
-        <a href="{confirmationLink}"
+        <a href="{job.ConfirmationLink}"
            style="display:inline-block;padding:10px 20px;background:#0ea5e9;color:#fff;text-decoration:none;border-radius:6px;">
             Confirm Email
         </a>
@@ -54,14 +55,14 @@ public class EmailSender(IOptions<EmailSettings> options) : IEmailSender
 
     <p>Thanks,<br>Midas Team</p>
     """;
-		await SendEmailAsync(email, "Confirm Email", htmlMessage);
+		await SendEmailAsync(job.Email, "Confirm Email", htmlMessage, cancellationToken);
 	}
 
-	public async Task SendPasswordResetLinkAsync(ApplicationUser user, string email, string resetLink)
+	private async Task SendPasswordResetLinkAsync(PasswordResetJob job, CancellationToken cancellationToken)
 	{
 		string html =
 		$$"""
-    <h2>Hello {{user.FirstName}},</h2>
+    <h2>Hello {{job.User.FirstName}},</h2>
 
     <p>
         We received a request to reset your password.
@@ -72,7 +73,7 @@ public class EmailSender(IOptions<EmailSettings> options) : IEmailSender
     </p>
 
     <p>
-        <a href="{{resetLink}}"
+        <a href="{{job.ResetLink}}"
            style="
                display:inline-block;
                padding:12px 24px;
@@ -95,20 +96,15 @@ public class EmailSender(IOptions<EmailSettings> options) : IEmailSender
     </p>
     """;
 
-		await SendEmailAsync(
-			email,
-			"Reset your password",
-			html);
+		await SendEmailAsync(job.Email, "Reset your password", html, cancellationToken);
 	}
-	public async Task SendSecurityAlertAsync(
-		ApplicationUser user,
-		string email)
+	private async Task SendSecurityAlertAsync(SecurityAlertJob job, CancellationToken cancellationToken)
 	{
 		string html =
 		$$"""
     <h2>Security Alert</h2>
 
-    <p>Hello {{user.FirstName}},</p>
+    <p>Hello {{job.User.FirstName}},</p>
 
     <p>
         We detected an attempt to use a refresh token that has already been revoked.
@@ -141,10 +137,27 @@ public class EmailSender(IOptions<EmailSettings> options) : IEmailSender
     </p>
     """;
 
-		await SendEmailAsync(
-			email,
-			"Security Alert: Suspicious Account Activity",
-			html);
+		await SendEmailAsync(job.Email, "Security Alert: Suspicious Account Activity", html, cancellationToken);
+	}
+	public async Task SendAsync(IEmailJob job, CancellationToken cancellationToken)
+	{
+		switch (job)
+		{
+			case ConfirmEmailJob confirm:
+				await SendConfirmationLinkAsync(confirm, cancellationToken);
+				break;
+
+			case PasswordResetJob reset:
+				await SendPasswordResetLinkAsync(reset, cancellationToken);
+				break;
+
+			case SecurityAlertJob security:
+				await SendSecurityAlertAsync(security, cancellationToken);
+				break;
+
+			default:
+				throw new NotSupportedException(
+					$"Unsupported email job: {job.GetType().Name}");
+		}
 	}
 }
-

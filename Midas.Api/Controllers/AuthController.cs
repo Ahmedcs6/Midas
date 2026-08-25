@@ -5,30 +5,21 @@ namespace Midas.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(IAccountService accountService, IJwtService jwtService, IServiceScopeFactory scopeFactory) : ControllerBase
+public class AuthController(IAccountService accountService, IJwtService jwtService) : ControllerBase
 {
-	private readonly IAccountService _accountService = accountService;
-	private readonly IJwtService _jwtService = jwtService;
-	private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
-
 	[HttpPost("register")]
 	public async Task<IActionResult> Register([FromBody] RegisterRequest model)
 	{
-		var result = await _accountService.RegisterAsync(model);
+		var result = await accountService.RegisterAsync(model);
 		if (!result.Succeeded)
 			return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail("Register Error", result.Errors));
-		_ = Task.Run(async () =>
-		{
-			using var scope = _scopeFactory.CreateScope();
-			var accountService = scope.ServiceProvider.GetRequiredService<IAccountService>();
-			await accountService.SendConfirmEmailAsync(new() { Email = model.Email });
-		});
+		await accountService.SendConfirmEmailAsync(new() { Email = model.Email });
 		return StatusCode(StatusCodes.Status201Created, ResponseHelper.Success(result.User, "Register Succeeded, please confirm your email."));
 	}
 	[HttpPost("login")]
 	public async Task<IActionResult> Login([FromBody] LoginRequest model)
 	{
-		var result = await _accountService.LoginAsync(model);
+		var result = await accountService.LoginAsync(model);
 		if (!result.Succeeded)
 		{
 			if (result.Errors.Contains("Please confirm your email."))
@@ -45,12 +36,7 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 	[HttpPost("resend-confirm-email")]
 	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailRequset model)
 	{
-		_ = Task.Run(async () =>
-		{
-			using var scope = _scopeFactory.CreateScope();
-			var accountService = scope.ServiceProvider.GetRequiredService<IAccountService>();
-			await accountService.SendConfirmEmailAsync(new() { Email = model.Email });
-		});
+		await accountService.SendConfirmEmailAsync(new() { Email = model.Email });
 		return Ok(ResponseHelper.Success(new { }));
 	}
 	[HttpPost("confirm-email")]
@@ -58,7 +44,7 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 	[FromQuery] string userId,
 	[FromQuery] string token)
 	{
-		var result = await _accountService.ConfirmEmailAsync(userId, token);
+		var result = await accountService.ConfirmEmailAsync(userId, token);
 		if (!result.Succeeded)
 		{
 			return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail("Invalid data.", result.Errors));
@@ -68,7 +54,7 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 	[HttpPost("refresh")]
 	public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest model)
 	{
-		var result = await _jwtService.RefreshAsync(model);
+		var result = await jwtService.RefreshAsync(model);
 		if (!result.Succeeded)
 			return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail("Invalid data.", result.Errors));
 		return Ok(ResponseHelper.Success(result.RefreshTokenResponse));
@@ -76,7 +62,7 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 	[HttpPost("forgot-password")]
 	public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest model)
 	{
-		var result = await _accountService.ForgotPasswordAsync(model);
+		var result = await accountService.ForgotPasswordAsync(model);
 		if (!result.Succeeded)
 			return BadRequest(result.Errors);
 		return Ok();
@@ -84,7 +70,7 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 	[HttpPost("reset-password")]
 	public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest model)
 	{
-		var result = await _accountService.ResetPasswordAsync(model);
+		var result = await accountService.ResetPasswordAsync(model);
 		if (!result.Succeeded)
 			return BadRequest(result.Errors);
 		return Ok();

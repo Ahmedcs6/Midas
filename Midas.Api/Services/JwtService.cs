@@ -1,25 +1,22 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Threading.Channels;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Midas.Api.Services;
 
-public class JwtService(ILogger<JwtService> logger, UserManager<ApplicationUser> userManager, IOptions<JwtSettings> jwt, ApplicationDbContext context, IEmailSender emailSender) : IJwtService
+public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, UserManager<ApplicationUser> userManager, IOptions<JwtSettings> jwt, ApplicationDbContext context) : IJwtService
 {
-	private readonly ILogger<JwtService> _logger = logger;
-	private readonly UserManager<ApplicationUser> _userManager = userManager;
-	private readonly ApplicationDbContext _context = context;
-	private readonly IEmailSender _emailSender = emailSender;
 	private readonly JwtSettings _jwt = jwt.Value;
 
 	public async Task<JwtSecurityToken> CreateJwtTokenAsync(ApplicationUser user)
 	{
 
-		_logger.LogDebug("Creating JWT for user {UserId}", user.Id);
-		var userClaims = await _userManager.GetClaimsAsync(user);
-		var roles = await _userManager.GetRolesAsync(user);
+		logger.LogDebug("Creating JWT for user {UserId}", user.Id);
+		var userClaims = await userManager.GetClaimsAsync(user);
+		var roles = await userManager.GetRolesAsync(user);
 		var roleClaims = new List<Claim>();
 		foreach (var role in roles)
 		{
@@ -45,7 +42,7 @@ public class JwtService(ILogger<JwtService> logger, UserManager<ApplicationUser>
 				signingCredentials: signingCredentials
 				);
 
-		_logger.LogDebug(
+		logger.LogDebug(
 				   "JWT created for {UserId}: Jti={Jti}, Expires={Expires}, Roles={Roles}",
 				   user.Id,
 				   jwtSecurityToken.Id,
@@ -57,7 +54,7 @@ public class JwtService(ILogger<JwtService> logger, UserManager<ApplicationUser>
 	public byte[] GenerateRefreshToken()
 	{
 		var bytes = RandomNumberGenerator.GetBytes(64);
-		_logger.LogTrace("Generated refresh token bytes");
+		logger.LogTrace("Generated refresh token bytes");
 		return bytes;
 	}
 
@@ -69,12 +66,12 @@ public class JwtService(ILogger<JwtService> logger, UserManager<ApplicationUser>
 		};
 		var bytes = Convert.FromBase64String(model.RefreshToken);
 		var hash = Convert.ToBase64String(SHA256.HashData(bytes));
-		var oldRefreshToken = await _context.RefreshTokens.Include(t => t.User).FirstOrDefaultAsync(t => t.TokenHash == hash);
+		var oldRefreshToken = await context.RefreshTokens.Include(t => t.User).FirstOrDefaultAsync(t => t.TokenHash == hash);
 
-		_logger.LogDebug("Refresh attempt: token hash prefix {HashPrefix}", hash[..8]);
+		logger.LogDebug("Refresh attempt: token hash prefix {HashPrefix}", hash[..8]);
 		if (oldRefreshToken is null)
 		{
-			_logger.LogWarning("Refresh failed: token hash not found");
+			logger.LogWarning("Refresh failed: token hash not found");
 			AuthResult.Succeeded = false;
 			AuthResult.Errors = ["Invalid token."];
 			return AuthResult;
@@ -82,36 +79,36 @@ public class JwtService(ILogger<JwtService> logger, UserManager<ApplicationUser>
 		ApplicationUser user = oldRefreshToken.User!;
 		if (oldRefreshToken.IsExpired)
 		{
-			_logger.LogWarning(
+			logger.LogWarning(
 							"Refresh failed: expired token for {UserId}, expired at {ExpiredAt}",
 							user.Id,
 							oldRefreshToken.ExpiresAt);
 			AuthResult.Succeeded = false;
 			AuthResult.Errors.Add("Expired token.");
 		}
-		var rowsAffected = await _context.RefreshTokens
+		var rowsAffected = await context.RefreshTokens
 			.Where(t => t.Id == oldRefreshToken.Id && t.RevokedAt == null)
 			.ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTime.UtcNow));
 		if (rowsAffected == 0)
 		{
-			_logger.LogError(
+			logger.LogError(
 							"SECURITY ALERT: Token reuse detected for {UserId}. Token {TokenId} was already revoked.",
 							user.Id,
 							oldRefreshToken.Id);
-			await _context.RefreshTokens
+			await context.RefreshTokens
 				.Where(t => t.ApplicationUserId == oldRefreshToken.ApplicationUserId &&
 							t.RevokedAt == null)
 				.ExecuteUpdateAsync(setters =>
 					setters.SetProperty(
 						t => t.RevokedAt,
 						DateTime.UtcNow));
-			_logger.LogInformation("Revoked all active tokens for {UserId} due to suspected reuse", user.Id);
-			await _emailSender.SendSecurityAlertAsync(user, user.Email!);
+			logger.LogInformation("Revoked all active tokens for {UserId} due to suspected reuse", user.Id);
+			await channel.Writer.WriteAsync(new SecurityAlertJob(user, user.Email!));
 			AuthResult.Succeeded = false;
 			AuthResult.Errors.Add("Revoked token.");
 			return AuthResult;
 		}
-		_logger.LogDebug("Revoked old refresh token {TokenId} for {UserId}", oldRefreshToken.Id, user.Id);
+		logger.LogDebug("Revoked old refresh token {TokenId} for {UserId}", oldRefreshToken.Id, user.Id);
 		if (!AuthResult.Succeeded)
 			return AuthResult;
 		bytes = GenerateRefreshToken();
@@ -122,9 +119,9 @@ public class JwtService(ILogger<JwtService> logger, UserManager<ApplicationUser>
 			Client = oldRefreshToken.Client,
 			ApplicationUserId = oldRefreshToken.ApplicationUserId
 		};
-		_context.RefreshTokens.Add(newToken);
-		await _context.SaveChangesAsync();
-		_logger.LogInformation(
+		context.RefreshTokens.Add(newToken);
+		await context.SaveChangesAsync();
+		logger.LogInformation(
 				  "Token refreshed for {UserId}: new token {TokenId}, expires {ExpiresAt}",
 				  user.Id,
 				  newToken.Id,

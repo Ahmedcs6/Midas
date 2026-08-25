@@ -6,8 +6,6 @@ namespace Midas.Api.Middlewares;
 
 public class GlobalExceptionHandlingMiddleware(ILogger<GlobalExceptionHandlingMiddleware> logger) : IMiddleware
 {
-	private readonly ILogger<GlobalExceptionHandlingMiddleware> _logger = logger;
-
 	public async Task InvokeAsync(HttpContext context, RequestDelegate next)
 	{
 		try
@@ -16,7 +14,7 @@ public class GlobalExceptionHandlingMiddleware(ILogger<GlobalExceptionHandlingMi
 		}
 		catch (Exception e)
 		{
-			_logger.LogError(
+			logger.LogError(
 				e,
 				"Unhandled exception while processing {Method} {Path}",
 				context.Request.Method,
