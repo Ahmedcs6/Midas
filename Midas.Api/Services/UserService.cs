@@ -11,8 +11,8 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 		user.About = request.About;
 		user.Address = request.Address;
 		user.BirthDate = request.BirthDate;
-		await userManager.UpdateAsync(user);
-		return true;
+		var result = await userManager.UpdateAsync(user);
+		return result.Succeeded;
 	}
 
 	public async Task<bool> EditAvatarAsync(string userId, EditAvatarRequest request)
@@ -22,7 +22,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 		var fileName = await fileStorage.SaveAsync(request.Image, "Avatars");
 		user!.ImageUrl = fileName;
 		var result = await userManager.UpdateAsync(user);
-		if (oldimg is not null) await fileStorage.DeleteAsync($"Avatars/{user.ImageUrl}");
+		if (oldimg is not null) await fileStorage.DeleteAsync($"Avatars/{oldimg}");
 		return result.Succeeded;
 	}
 
@@ -32,13 +32,16 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 		var user = await userManager.FindByNameAsync(userName);
 		if (user is null)
 			return false;
+		if (user == me)
+			return false;
 		var follow = new Follow
 		{
 			FollowerId = me!.Id,
 			FollowingId = user.Id
 		};
 		await context.Follows.AddAsync(follow);
-		return (await context.SaveChangesAsync()) == 1;
+		await context.SaveChangesAsync();
+		return true;
 	}
 
 	public async Task<UserResponse?> GetByUserNameAsync(string userName)

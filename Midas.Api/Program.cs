@@ -8,11 +8,15 @@ using Microsoft.IdentityModel.Tokens;
 using Midas.Api.Middlewares;
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.Configure<JwtSettings>(
-	builder.Configuration.GetSection(JwtSettings.SectionName));
 
 builder.Services.Configure<EmailSettings>(
 	builder.Configuration.GetSection("EmailSettings"));
+
+builder.Services.AddOptions<JwtSettings>()
+	.Bind(builder.Configuration.GetSection(JwtSettings.SectionName))
+	.ValidateDataAnnotations()
+	.Validate(s => !string.IsNullOrEmpty(s.Key), "JwtSettings:Key is required")
+	.ValidateOnStart();
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 	options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -24,12 +28,6 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 })
 	.AddEntityFrameworkStores<ApplicationDbContext>()
 	.AddDefaultTokenProviders();
-builder.Services.AddOptions<JwtSettings>()
-	.Bind(builder.Configuration.GetSection(JwtSettings.SectionName))
-	.ValidateDataAnnotations()
-	.Validate(s => !string.IsNullOrEmpty(s.Key), "JwtSettings:Key is required")
-	.ValidateOnStart();
-
 builder.Services.AddAuthentication(options =>
 {
 	options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
