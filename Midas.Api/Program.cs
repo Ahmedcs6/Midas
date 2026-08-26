@@ -3,15 +3,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Midas.Api.Middlewares;
-
 var builder = WebApplication.CreateBuilder(args);
-
-var jwtSettings = builder.Configuration
-	.GetSection(JwtSettings.SectionName)
-	.Get<JwtSettings>()
-	?? throw new InvalidOperationException("JwtSettings section is missing or invalid in configuration.");
 
 builder.Services.Configure<JwtSettings>(
 	builder.Configuration.GetSection(JwtSettings.SectionName));
@@ -29,14 +24,22 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 })
 	.AddEntityFrameworkStores<ApplicationDbContext>()
 	.AddDefaultTokenProviders();
+builder.Services.AddOptions<JwtSettings>()
+	.Bind(builder.Configuration.GetSection(JwtSettings.SectionName))
+	.ValidateDataAnnotations()
+	.Validate(s => !string.IsNullOrEmpty(s.Key), "JwtSettings:Key is required")
+	.ValidateOnStart();
 
 builder.Services.AddAuthentication(options =>
 {
 	options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
 	options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-	.AddJwtBearer(options =>
+	.AddJwtBearer();
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+	.Configure<IOptions<JwtSettings>>((options, jwtSettingsOptions) =>
 	{
+		var jwtSettings = jwtSettingsOptions.Value;
 		options.TokenValidationParameters = new TokenValidationParameters
 		{
 			ValidateIssuer = true,
@@ -91,3 +94,4 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+

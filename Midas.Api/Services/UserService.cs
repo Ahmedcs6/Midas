@@ -18,10 +18,12 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 	public async Task<bool> EditAvatarAsync(string userId, EditAvatarRequest request)
 	{
 		var user = await userManager.FindByIdAsync(userId);
-		if (user!.ImageUrl is not null) await fileStorage.DeleteAsync($"Avatars/{user.ImageUrl}");
+		var oldimg = user!.ImageUrl;
 		var fileName = await fileStorage.SaveAsync(request.Image, "Avatars");
 		user!.ImageUrl = fileName;
-		return (await userManager.UpdateAsync(user)).Succeeded;
+		var result = await userManager.UpdateAsync(user);
+		if (oldimg is not null) await fileStorage.DeleteAsync($"Avatars/{user.ImageUrl}");
+		return result.Succeeded;
 	}
 
 	public async Task<bool> Follow(string userName)
