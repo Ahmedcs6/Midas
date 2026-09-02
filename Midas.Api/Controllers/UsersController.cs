@@ -20,14 +20,14 @@ public class UsersController(ICurrentUser currentUser, IUserService userService)
 	[Authorize]
 	public async Task<IActionResult> Edit([FromBody] EditUserRequest request)
 	{
-		var result = await userService.EditAsync(currentUser.UserId!, request);
+		var result = await userService.EditAsync(currentUser.UserId, request);
 		return result ? Ok(ResponseHelper.Success<object>(new { })) : Unauthorized();
 	}
 	[HttpPost("me/avatar")]
 	[Authorize]
 	public async Task<IActionResult> EditAvatar([FromForm] EditAvatarRequest request)
 	{
-		var result = await userService.EditAvatarAsync(currentUser.UserId!, request);
+		var result = await userService.EditAvatarAsync(currentUser.UserId, request);
 		return result ? Ok(ResponseHelper.Success<object>(new { })) : BadRequest();
 	}
 	[HttpPost("follow/{userName}")]
@@ -35,6 +35,13 @@ public class UsersController(ICurrentUser currentUser, IUserService userService)
 	public async Task<IActionResult> Follow(string userName)
 	{
 		var result = await userService.Follow(userName);
+		return result ? Ok(ResponseHelper.Success(new { })) : BadRequest("error");
+	}
+	[HttpPost("unfollow/{userName}")]
+	[Authorize]
+	public async Task<IActionResult> Unfollow(string userName)
+	{
+		var result = await userService.Unfollow(userName);
 		return result ? Ok(ResponseHelper.Success(new { })) : BadRequest();
 	}
 }

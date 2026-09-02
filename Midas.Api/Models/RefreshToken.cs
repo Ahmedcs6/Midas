@@ -17,7 +17,7 @@ public class RefreshToken
 
 	public bool IsActive => RevokedAt == null && !IsExpired;
 
-	public string? ApplicationUserId { get; set; }
+	public Guid ApplicationUserId { get; set; }
 
-	public ApplicationUser? User { get; set; }
+	public ApplicationUser User { get; set; } = null!;
 }

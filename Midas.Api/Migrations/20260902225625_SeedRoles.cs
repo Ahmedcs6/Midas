@@ -11,10 +11,10 @@ namespace Midas.Api.Migrations
 		protected override void Up(MigrationBuilder migrationBuilder)
 		{
 			migrationBuilder.InsertData(
-				table: "AspNetRoles",
-				columns: ["Id", "Name", "NormalizedName", "ConcurrencyStamp"],
-				values: [Guid.NewGuid().ToString(), "User", "User".ToUpper(), Guid.NewGuid().ToString()]
-			);
+							table: "AspNetRoles",
+							columns: ["Id", "Name", "NormalizedName", "ConcurrencyStamp"],
+							values: [Guid.NewGuid().ToString(), "User", "User".ToUpper(), Guid.NewGuid().ToString()]
+						);
 			migrationBuilder.InsertData(
 				table: "AspNetRoles",
 				columns: ["Id", "Name", "NormalizedName", "ConcurrencyStamp"],

@@ -2,9 +2,9 @@ namespace Midas.Api.Services;
 
 public class UserService(UserManager<ApplicationUser> userManager, IFileStorage fileStorage, ICurrentUser currentUser, ApplicationDbContext context) : IUserService
 {
-	public async Task<bool> EditAsync(string userId, EditUserRequest request)
+	public async Task<bool> EditAsync(Guid userId, EditUserRequest request)
 	{
-		var user = await userManager.FindByIdAsync(userId);
+		var user = await userManager.FindByIdAsync(userId.ToString());
 		if (user is null) return false;
 		user.FirstName = request.FirstName;
 		user.LastName = request.LastName;
@@ -15,9 +15,9 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 		return result.Succeeded;
 	}
 
-	public async Task<bool> EditAvatarAsync(string userId, EditAvatarRequest request)
+	public async Task<bool> EditAvatarAsync(Guid userId, EditAvatarRequest request)
 	{
-		var user = await userManager.FindByIdAsync(userId);
+		var user = await userManager.FindByIdAsync(userId.ToString());
 		var oldimg = user!.ImageUrl;
 		var fileName = await fileStorage.SaveAsync(request.Image, "Avatars");
 		user!.ImageUrl = fileName;
@@ -28,38 +28,48 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 
 	public async Task<bool> Follow(string userName)
 	{
-		var me = await userManager.FindByIdAsync(currentUser.UserId!);
+		var me = await userManager.FindByIdAsync(currentUser.UserId.ToString());
 		var user = await userManager.FindByNameAsync(userName);
 		if (user is null)
 			return false;
-		if (user == me)
+		if (user.Id == me!.Id)
 			return false;
 		var follow = new Follow
 		{
 			FollowerId = me!.Id,
 			FollowingId = user.Id
 		};
-		await context.Follows.AddAsync(follow);
+		context.Follows.Add(follow);
 		await context.SaveChangesAsync();
 		return true;
+	}
+	public async Task<bool> Unfollow(string userName)
+	{
+		var user = await userManager.FindByNameAsync(userName);
+		if (user is null)
+			return false;
+		var result = await context.Follows.Where(f => f.FollowerId == currentUser.UserId && f.FollowingId == user.Id).ExecuteDeleteAsync();
+		return result > 0;
 	}
 
 	public async Task<UserResponse?> GetByUserNameAsync(string userName)
 	{
-		ApplicationUser? user = await userManager.FindByNameAsync(userName);
-		if (user is null)
-			return null;
-		UserResponse response = new()
+		return await context.Users
+		.AsNoTracking()
+		.Where(u => u.UserName == userName)
+		.Select(u => new UserResponse
 		{
-			FirstName = user.FirstName,
-			LastName = user.LastName,
-			UserName = user.UserName!,
-			Gender = user.Gender,
-			About = user.About,
-			Address = user.Address,
-			BirthDate = user.BirthDate,
-			ImageUrl = user.ImageUrl
-		};
-		return response;
+			FirstName = u.FirstName,
+			LastName = u.LastName,
+			UserName = u.UserName!,
+			Gender = u.Gender,
+			About = u.About,
+			Address = u.Address,
+			BirthDate = u.BirthDate,
+			ImageUrl = u.ImageUrl,
+			FollowersNumber = context.Follows.Count(f => f.FollowingId == u.Id),
+			FollowingNumber = context.Follows.Count(f => f.FollowerId == u.Id)
+		})
+		.SingleOrDefaultAsync();
 	}
 }

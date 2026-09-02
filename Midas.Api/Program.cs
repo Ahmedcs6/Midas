@@ -21,7 +21,7 @@ builder.Services.AddOptions<JwtSettings>()
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 	options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
 {
 	options.User.RequireUniqueEmail = true;
 	options.SignIn.RequireConfirmedEmail = true;
@@ -67,6 +67,7 @@ builder.Services.AddScoped<IEmailSender, EmailSender>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IPostService, PostService>();
 builder.Services.AddScoped<IFileStorage, LocalFileStorage>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddControllers();
@@ -92,4 +93,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-

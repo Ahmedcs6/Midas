@@ -24,7 +24,7 @@ public sealed class EmailWorker(Channel<IEmailJob> channel, IServiceScopeFactory
 	}
 	public override async Task StopAsync(CancellationToken cancellationToken)
 	{
-		var completed = channel.Writer.TryComplete();
+		channel.Writer.TryComplete();
 		await base.StopAsync(cancellationToken);
 
 	}

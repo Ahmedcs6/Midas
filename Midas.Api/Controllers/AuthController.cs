@@ -41,7 +41,7 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 	}
 	[HttpPost("confirm-email")]
 	public async Task<IActionResult> ConfirmEmail(
-	[FromQuery] string userId,
+	[FromQuery] Guid userId,
 	[FromQuery] string token)
 	{
 		var result = await accountService.ConfirmEmailAsync(userId, token);

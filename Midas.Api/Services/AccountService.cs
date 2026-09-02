@@ -161,9 +161,9 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		logger.LogInformation("Sending confirmation email to {UserId} ({Email})", user.Id, user.Email);
 		await channel.Writer.WriteAsync(new ConfirmEmailJob(user, model.Email, confirmationLink));
 	}
-	public async Task<AuthResult> ConfirmEmailAsync(string userId, string token)
+	public async Task<AuthResult> ConfirmEmailAsync(Guid userId, string token)
 	{
-		var user = await userManager.FindByIdAsync(userId);
+		var user = await userManager.FindByIdAsync(userId.ToString());
 		if (user is null)
 		{
 			logger.LogWarning("Email confirmation failed: user {UserId} not found", userId);

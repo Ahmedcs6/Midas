@@ -6,6 +6,6 @@ public interface IAccountService
 	Task<AuthResult> LoginAsync(LoginRequest model);
 	Task<AuthResult> ForgotPasswordAsync(ForgotPasswordRequest model);
 	Task SendConfirmEmailAsync(ConfirmEmailRequset model);
-	Task<AuthResult> ConfirmEmailAsync(string userId, string token);
+	Task<AuthResult> ConfirmEmailAsync(Guid userId, string token);
 	Task<AuthResult> ResetPasswordAsync(ResetPasswordRequest model);
 }
