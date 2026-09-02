@@ -56,7 +56,7 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 	{
 		var result = await jwtService.RefreshAsync(model);
 		if (!result.Succeeded)
-			return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail("Invalid data.", result.Errors));
+			return StatusCode(StatusCodes.Status401Unauthorized, ResponseHelper.Fail("Invalid data.", result.Errors));
 		return Ok(ResponseHelper.Success(result.RefreshTokenResponse));
 	}
 	[HttpPost("forgot-password")]

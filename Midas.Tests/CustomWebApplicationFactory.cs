@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Midas.Api.Interfaces;
 
 namespace Midas.Tests;
 
@@ -15,6 +17,10 @@ public class CustomWebApplicationFactory
 		{
 			config.AddUserSecrets<Program>(
 				optional: false);
+		});
+		builder.ConfigureServices(options =>
+		{
+			options.AddScoped<IEmailSender, FakeEmailSender>();
 		});
 	}
 }
