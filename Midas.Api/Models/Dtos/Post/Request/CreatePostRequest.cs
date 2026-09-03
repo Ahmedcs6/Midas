@@ -4,5 +4,5 @@ public class CreatePostRequest
 {
 	public string Content { get; set; } = "";
 	public PrivacyType Privacy { get; set; }
-	public IFormFile Image { get; set; } = null!;
+	public IFormFile? Image { get; set; }
 }

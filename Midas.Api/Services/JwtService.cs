@@ -57,61 +57,87 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 		logger.LogTrace("Generated refresh token bytes");
 		return bytes;
 	}
-
-	public async Task<AuthResult> RefreshAsync(RefreshTokenRequest model)
+	public async Task<ServiceResult<RefreshTokenResponse>> RefreshAsync(RefreshTokenRequest model)
 	{
-		var AuthResult = new AuthResult
-		{
-			Succeeded = true
-		};
 		var bytes = Convert.FromBase64String(model.RefreshToken);
 		var hash = Convert.ToBase64String(SHA256.HashData(bytes));
-		var oldRefreshToken = await context.RefreshTokens.Include(t => t.User).FirstOrDefaultAsync(t => t.TokenHash == hash);
+
+		var oldRefreshToken = await context.RefreshTokens
+			.Include(t => t.User)
+			.FirstOrDefaultAsync(t => t.TokenHash == hash);
 
 		logger.LogDebug("Refresh attempt: token hash prefix {HashPrefix}", hash[..8]);
+
 		if (oldRefreshToken is null)
 		{
 			logger.LogWarning("Refresh failed: token hash not found");
-			AuthResult.Succeeded = false;
-			AuthResult.Errors = ["Invalid token."];
-			return AuthResult;
+
+			return new()
+			{
+				State = ServiceState.Unauthorized,
+				Message = "Invalid token."
+			};
 		}
+
 		ApplicationUser user = oldRefreshToken.User!;
+
 		if (oldRefreshToken.IsExpired)
 		{
 			logger.LogWarning(
-							"Refresh failed: expired token for {UserId}, expired at {ExpiredAt}",
-							user.Id,
-							oldRefreshToken.ExpiresAt);
-			AuthResult.Succeeded = false;
-			AuthResult.Errors.Add("Expired token.");
+				"Refresh failed: expired token for {UserId}, expired at {ExpiredAt}",
+				user.Id,
+				oldRefreshToken.ExpiresAt);
+
+			return new()
+			{
+				State = ServiceState.Unauthorized,
+				Message = "Expired token."
+			};
 		}
+
 		var rowsAffected = await context.RefreshTokens
 			.Where(t => t.Id == oldRefreshToken.Id && t.RevokedAt == null)
-			.ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTime.UtcNow));
+			.ExecuteUpdateAsync(s => s.SetProperty(
+				t => t.RevokedAt,
+				DateTime.UtcNow));
+
 		if (rowsAffected == 0)
 		{
 			logger.LogError(
-							"SECURITY ALERT: Token reuse detected for {UserId}. Token {TokenId} was already revoked.",
-							user.Id,
-							oldRefreshToken.Id);
+				"SECURITY ALERT: Token reuse detected for {UserId}. Token {TokenId} was already revoked.",
+				user.Id,
+				oldRefreshToken.Id);
+
 			await context.RefreshTokens
-				.Where(t => t.ApplicationUserId == oldRefreshToken.ApplicationUserId &&
-							t.RevokedAt == null)
+				.Where(t =>
+					t.ApplicationUserId == oldRefreshToken.ApplicationUserId &&
+					t.RevokedAt == null)
 				.ExecuteUpdateAsync(setters =>
 					setters.SetProperty(
 						t => t.RevokedAt,
 						DateTime.UtcNow));
-			logger.LogInformation("Revoked all active tokens for {UserId} due to suspected reuse", user.Id);
-			await channel.Writer.WriteAsync(new SecurityAlertJob(user, user.Email!));
-			AuthResult.Succeeded = false;
-			AuthResult.Errors.Add("Revoked token.");
-			return AuthResult;
+
+			logger.LogInformation(
+				"Revoked all active tokens for {UserId} due to suspected reuse",
+				user.Id);
+
+			await channel.Writer.WriteAsync(
+				new SecurityAlertJob(user, user.Email!));
+
+			return new()
+			{
+				State = ServiceState.Unauthorized,
+				Message = "Revoked token."
+			};
 		}
-		logger.LogDebug("Revoked old refresh token {TokenId} for {UserId}", oldRefreshToken.Id, user.Id);
-		if (!AuthResult.Succeeded)
-			return AuthResult;
+
+		logger.LogDebug(
+			"Revoked old refresh token {TokenId} for {UserId}",
+			oldRefreshToken.Id,
+			user.Id);
+
 		bytes = GenerateRefreshToken();
+
 		RefreshToken newToken = new()
 		{
 			TokenHash = Convert.ToBase64String(SHA256.HashData(bytes)),
@@ -119,28 +145,28 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 			Client = oldRefreshToken.Client,
 			ApplicationUserId = oldRefreshToken.ApplicationUserId
 		};
+
 		context.RefreshTokens.Add(newToken);
 		await context.SaveChangesAsync();
+
 		logger.LogInformation(
-				  "Token refreshed for {UserId}: new token {TokenId}, expires {ExpiresAt}",
-				  user.Id,
-				  newToken.Id,
-				  newToken.ExpiresAt);
-		var AccessToken = await CreateJwtTokenAsync(user);
-		AuthResult.User = new()
+			"Token refreshed for {UserId}: new token {TokenId}, expires {ExpiresAt}",
+			user.Id,
+			newToken.Id,
+			newToken.ExpiresAt);
+
+		var accessToken = await CreateJwtTokenAsync(user);
+
+		return new()
 		{
-			FirstName = user.FirstName,
-			LastName = user.LastName,
-			UserName = user.UserName!,
-			Gender = user.Gender
+			State = ServiceState.Success,
+			Data = new()
+			{
+				AccessToken = new JwtSecurityTokenHandler().WriteToken(accessToken),
+				AccessTokenExpiresAt = accessToken.ValidTo,
+				RefreshToken = Convert.ToBase64String(bytes),
+				RefreshTokenExpiresAt = newToken.ExpiresAt
+			}
 		};
-		AuthResult.RefreshTokenResponse = new()
-		{
-			AccessToken = new JwtSecurityTokenHandler().WriteToken(AccessToken),
-			AccessTokenExpiresAt = AccessToken.ValidTo,
-			RefreshToken = Convert.ToBase64String(bytes),
-			RefreshTokenExpiresAt = newToken.ExpiresAt
-		};
-		return AuthResult;
 	}
 }

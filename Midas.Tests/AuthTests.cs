@@ -63,7 +63,6 @@ public class AuthTests(CustomWebApplicationFactory factory)
 		var result = await response.Content.ReadFromJsonAsync<ApiResponse<RefreshTokenResponse>>(_jsonSerializerOptions);
 		Assert.True(result!.Success);
 		Assert.NotNull(result.Data);
-		Assert.Null(result.Errors);
 		Assert.NotNull(result.Data.AccessToken);
 		Assert.NotEmpty(result.Data.AccessToken);
 		Assert.NotNull(result.Data.RefreshToken);
@@ -78,7 +77,6 @@ public class AuthTests(CustomWebApplicationFactory factory)
 		var result = await response.Content.ReadFromJsonAsync<ApiResponse<RefreshTokenResponse>>(_jsonSerializerOptions);
 		Assert.False(result!.Success);
 		Assert.Null(result.Data);
-		Assert.NotNull(result.Errors);
 	}
 	[Fact]
 	public async Task RefreshToken_Should_Return_New_Tokens()

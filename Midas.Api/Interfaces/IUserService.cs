@@ -2,9 +2,9 @@ namespace Midas.Api.Interfaces;
 
 public interface IUserService
 {
-	Task<UserResponse?> GetByUserNameAsync(string userName);
-	Task<bool> EditAsync(Guid userId, EditUserRequest request);
-	Task<bool> EditAvatarAsync(Guid userId, EditAvatarRequest request);
-	Task<bool> Follow(string userName);
-	Task<bool> Unfollow(string userName);
+	Task<ServiceResult<UserResponse>> GetByUserNameAsync(string userName);
+	Task<ServiceResult> EditAsync(Guid userId, EditUserRequest request);
+	Task<ServiceResult> EditAvatarAsync(Guid userId, EditAvatarRequest request);
+	Task<ServiceResult> Follow(string userName);
+	Task<ServiceResult> Unfollow(string userName);
 }

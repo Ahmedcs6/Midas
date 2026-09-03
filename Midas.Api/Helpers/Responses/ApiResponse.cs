@@ -1,17 +1,11 @@
 
 namespace Midas.Api.Helpers.Responses;
 
-public class ApiResponse<T>(
-	bool success,
-	string message,
-	T? data = default,
-	List<string>? errors = null)
+public class ApiResponse<T>
 {
-	public bool Success { get; init; } = success;
+	public bool Success { get; init; }
 
-	public string Message { get; init; } = message;
+	public string? Message { get; init; } = "";
 
-	public T? Data { get; init; } = data;
-
-	public List<string>? Errors { get; init; } = errors;
+	public T? Data { get; init; } = default;
 }

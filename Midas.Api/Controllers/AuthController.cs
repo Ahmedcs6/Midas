@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Midas.Api.Helpers.Responses;
 
 namespace Midas.Api.Controllers;
 
@@ -8,71 +7,45 @@ namespace Midas.Api.Controllers;
 public class AuthController(IAccountService accountService, IJwtService jwtService) : ControllerBase
 {
 	[HttpPost("register")]
-	public async Task<IActionResult> Register([FromBody] RegisterRequest model)
+	public async Task<IActionResult> Register([FromBody] RegisterRequest request)
 	{
-		var result = await accountService.RegisterAsync(model);
-		if (!result.Succeeded)
-			return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail("Register Error", result.Errors));
-		await accountService.SendConfirmEmailAsync(new() { Email = model.Email });
-		return StatusCode(StatusCodes.Status201Created, ResponseHelper.Success(result.User, "Register Succeeded, please confirm your email."));
+		var result = await accountService.RegisterAsync(request);
+		return this.ToActionResult(result, StatusCodes.Status201Created);
 	}
 	[HttpPost("login")]
-	public async Task<IActionResult> Login([FromBody] LoginRequest model)
+	public async Task<IActionResult> Login([FromBody] LoginRequest request)
 	{
-		var result = await accountService.LoginAsync(model);
-		if (!result.Succeeded)
-		{
-			if (result.Errors.Contains("Please confirm your email."))
-			{
-				return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail("Please confirm your email.", result.Errors));
-			}
-			if (result.Errors.Contains("Invalid email or password."))
-			{
-				return Unauthorized(ResponseHelper.Fail("Invalid email or password.", result.Errors));
-			}
-		}
-		return Ok(ResponseHelper.Success(result.RefreshTokenResponse, "Login Succeeded."));
+		var result = await accountService.LoginAsync(request);
+		return this.ToActionResult(result);
 	}
 	[HttpPost("resend-confirm-email")]
-	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailRequset model)
+	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailRequset request)
 	{
-		await accountService.SendConfirmEmailAsync(new() { Email = model.Email });
-		return Ok(ResponseHelper.Success(new { }));
+		var result = await accountService.SendConfirmEmailAsync(request);
+		return this.ToActionResult(result);
 	}
 	[HttpPost("confirm-email")]
-	public async Task<IActionResult> ConfirmEmail(
-	[FromQuery] Guid userId,
-	[FromQuery] string token)
+	public async Task<IActionResult> ConfirmEmail([FromQuery] Guid userId, [FromQuery] string token)
 	{
 		var result = await accountService.ConfirmEmailAsync(userId, token);
-		if (!result.Succeeded)
-		{
-			return StatusCode(StatusCodes.Status403Forbidden, ResponseHelper.Fail("Invalid data.", result.Errors));
-		}
-		return Ok(ResponseHelper.Success<object>(new { }));
+		return this.ToActionResult(result);
 	}
 	[HttpPost("refresh")]
-	public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest model)
+	public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
 	{
-		var result = await jwtService.RefreshAsync(model);
-		if (!result.Succeeded)
-			return StatusCode(StatusCodes.Status401Unauthorized, ResponseHelper.Fail("Invalid data.", result.Errors));
-		return Ok(ResponseHelper.Success(result.RefreshTokenResponse));
+		var result = await jwtService.RefreshAsync(request);
+		return this.ToActionResult(result);
 	}
 	[HttpPost("forgot-password")]
-	public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest model)
+	public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
 	{
-		var result = await accountService.ForgotPasswordAsync(model);
-		if (!result.Succeeded)
-			return BadRequest(result.Errors);
-		return Ok();
+		var result = await accountService.ForgotPasswordAsync(request);
+		return this.ToActionResult(result);
 	}
 	[HttpPost("reset-password")]
-	public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest model)
+	public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
 	{
-		var result = await accountService.ResetPasswordAsync(model);
-		if (!result.Succeeded)
-			return BadRequest(result.Errors);
-		return Ok();
+		var result = await accountService.ResetPasswordAsync(request);
+		return this.ToActionResult(result);
 	}
 }

@@ -17,10 +17,13 @@ global using Midas.Api.Models.Dtos.Auth.Request;
 global using Midas.Api.Models.Dtos.Auth.Response;
 global using Midas.Api.Models.Dtos.User.Request;
 global using Midas.Api.Models.Dtos.User.Response;
+global using Midas.Api.Models.Dtos.Post.Request;
+global using Midas.Api.Models.Dtos.Post.Response;
 
 global using Midas.Api.Configuration;
 global using Midas.Api.Data;
 global using Midas.Api.Helpers;
 global using Midas.Api.Interfaces;
 global using Midas.Api.Services;
+global using Midas.Api.Extensions;
 

@@ -11,7 +11,14 @@ public class PostController(IPostService postService) : ControllerBase
 	[HttpPost("")]
 	public async Task<IActionResult> CreatePost(CreatePostRequest request)
 	{
-		var response = await postService.CreatePost(request);
-		return StatusCode(StatusCodes.Status201Created, ResponseHelper.Success(response));
+		var result = await postService.CreatePostAsync(request);
+		return this.ToActionResult(result, StatusCodes.Status201Created);
 	}
+	[HttpPatch("{id}")]
+	public async Task<IActionResult> EditPost(int id, EditPostRequest request)
+	{
+		var result = await postService.EditPostAsync(id, request);
+		return this.ToActionResult(result);
+	}
+
 }

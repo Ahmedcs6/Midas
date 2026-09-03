@@ -8,27 +8,37 @@ namespace Midas.Api.Services;
 public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> channel, UserManager<ApplicationUser> userManager, ApplicationDbContext context, IJwtService jwtService) : IAccountService
 {
 
-	public async Task<AuthResult> RegisterAsync(RegisterRequest model)
+	public async Task<ServiceResult<UserResponse>> RegisterAsync(RegisterRequest request)
 	{
-		await using var transaction =
-			await context.Database.BeginTransactionAsync();
+		await using var transaction = await context.Database.BeginTransactionAsync();
 		ApplicationUser user = new()
 		{
-			FirstName = model.FirstName,
-			LastName = model.LastName,
-			UserName = model.UserName,
-			Gender = model.Gender,
-			Email = model.Email
+			FirstName = request.FirstName,
+			LastName = request.LastName,
+			UserName = request.UserName,
+			Gender = request.Gender,
+			Email = request.Email
 		};
-		var result = await userManager.CreateAsync(user, model.Password);
+		var result = await userManager.CreateAsync(user, request.Password);
 
 		if (!result.Succeeded)
 		{
 			logger.LogWarning(
 							"Registration failed for {Email}. Errors: {Errors}",
-							model.Email,
+							request.Email,
 							string.Join(", ", result.Errors.Select(e => e.Description)));
-			return new AuthResult { Succeeded = false, Errors = [.. result.Errors.Select(e => e.Description)] };
+			var errors = result.Errors.ToList();
+
+			var state = errors.Any(e =>
+				e.Code is "DuplicateUserName" or "DuplicateEmail")
+				? ServiceState.Conflict
+				: ServiceState.BadRequest;
+
+			return new()
+			{
+				State = state,
+				Message = string.Join(", ", errors.Select(e => e.Description))
+			};
 		}
 		result = await userManager.AddToRoleAsync(user, "User");
 		if (!result.Succeeded)
@@ -37,14 +47,16 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 						  "Failed to assign 'User' role to {UserId}. Errors: {Errors}",
 						  user.Id,
 						  string.Join(", ", result.Errors.Select(e => e.Description)));
-			return new AuthResult { Succeeded = false, Errors = [.. result.Errors.Select(e => e.Description)] };
+			throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
 		}
 		await transaction.CommitAsync();
 		logger.LogInformation("User registered: {UserId} ({Email})", user.Id, user.Email);
+
 		return new()
 		{
-			Succeeded = true,
-			User = new()
+			State = ServiceState.Success,
+			Message = "Register Succeeded, please confirm your email.",
+			Data = new()
 			{
 				FirstName = user.FirstName,
 				LastName = user.LastName,
@@ -53,36 +65,36 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			}
 		};
 	}
-	public async Task<AuthResult> LoginAsync(LoginRequest model)
+	public async Task<ServiceResult<RefreshTokenResponse>> LoginAsync(LoginRequest request)
 	{
-		var user = await userManager.FindByEmailAsync(model.Email);
+		var user = await userManager.FindByEmailAsync(request.Email);
 		if (user is not null && !await userManager.IsEmailConfirmedAsync(user))
 		{
-			logger.LogWarning("Login blocked: email not confirmed for {Email}", model.Email);
-			return new AuthResult { Succeeded = false, Errors = ["Please confirm your email."] };
+			logger.LogWarning("Login blocked: email not confirmed for {Email}", request.Email);
+			return new() { State = ServiceState.Forbidden, Message = "Please confirm your email." };
 		}
 
-		if (user is null || !await userManager.CheckPasswordAsync(user, model.Password))
+		if (user is null || !await userManager.CheckPasswordAsync(user, request.Password))
 		{
-			logger.LogWarning("Failed login attempt for {Email}", model.Email);
-			return new AuthResult { Succeeded = false, Errors = ["Invalid email or password."] };
+			logger.LogWarning("Failed login attempt for {Email}", request.Email);
+			return new() { State = ServiceState.Unauthorized, Message = "Invalid email or password." };
 		}
-		logger.LogInformation("User logged in: {UserId} ({Email}) from client {Client}", user.Id, user.Email, model.Client);
+		logger.LogInformation("User logged in: {UserId} ({Email}) from client {Client}", user.Id, user.Email, request.Client);
 		await context.RefreshTokens
-						.Where(t => t.ApplicationUserId == user.Id && t.Client == model.Client &&
+						.Where(t => t.ApplicationUserId == user.Id && t.Client == request.Client &&
 									t.RevokedAt == null)
 						.ExecuteUpdateAsync(setters =>
 							setters.SetProperty(
 								t => t.RevokedAt,
 								DateTime.UtcNow));
-		logger.LogDebug("Revoked previous refresh tokens for {UserId} on client {Client}", user.Id, model.Client);
+		logger.LogDebug("Revoked previous refresh tokens for {UserId} on client {Client}", user.Id, request.Client);
 		var token = await jwtService.CreateJwtTokenAsync(user);
 		var bytes = jwtService.GenerateRefreshToken();
 		var refreshToken = new RefreshToken
 		{
 			TokenHash = Convert.ToBase64String(SHA256.HashData(bytes)),
 			ExpiresAt = DateTime.UtcNow.AddDays(30),
-			Client = model.Client,
+			Client = request.Client,
 			ApplicationUserId = user.Id
 		};
 		context.RefreshTokens.Add(refreshToken);
@@ -90,15 +102,8 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		logger.LogInformation("Issued new refresh token for {UserId}, expires {ExpiresAt:O}", user.Id, refreshToken.ExpiresAt);
 		return new()
 		{
-			Succeeded = true,
-			User = new()
-			{
-				FirstName = user.FirstName,
-				LastName = user.LastName,
-				UserName = user.UserName!,
-				Gender = user.Gender
-			},
-			RefreshTokenResponse = new()
+			State = ServiceState.Success,
+			Data = new()
 			{
 				AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
 				AccessTokenExpiresAt = token.ValidTo,
@@ -107,77 +112,62 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			}
 		};
 	}
-	public async Task<AuthResult> ForgotPasswordAsync(ForgotPasswordRequest model)
+	public async Task<ServiceResult> ForgotPasswordAsync(ForgotPasswordRequest request)
 	{
-		var user = await userManager.FindByEmailAsync(model.Email);
+		var user = await userManager.FindByEmailAsync(request.Email);
 		if (user is null)
 		{
-			logger.LogInformation("Password reset requested for non-existent email: {Email}", model.Email);
-			return new()
-			{
-				Succeeded = true
-			};
+			logger.LogInformation("Password reset requested for non-existent email: {Email}", request.Email);
+			return new() { State = ServiceState.Success };
 		}
 		if (!await userManager.IsEmailConfirmedAsync(user))
 		{
 			logger.LogWarning("Password reset blocked: email not confirmed for {UserId}", user.Id);
 			return new()
 			{
-				Succeeded = false,
-				Errors = ["Please confirm your Email."]
+				State = ServiceState.Forbidden,
+				Message = "Please confirm your Email."
 			};
 		}
-		var token =
-			await userManager.GeneratePasswordResetTokenAsync(user);
+		var token = await userManager.GeneratePasswordResetTokenAsync(user);
 
-		var encodedToken =
-			WebEncoders.Base64UrlEncode(
-				Encoding.UTF8.GetBytes(token));
+		var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
 
 		var resetLink = $"https://localhost:7103/reset-password?userId={user.Id}&token={encodedToken}";
 		logger.LogInformation("Password reset link generated for {UserId}", user.Id);
-		await channel.Writer.WriteAsync(new PasswordResetJob(user, model.Email, resetLink));
+		await channel.Writer.WriteAsync(new PasswordResetJob(user, request.Email, resetLink));
 		return new()
 		{
-			Succeeded = true
+			State = ServiceState.Success
 		};
 	}
-	public async Task SendConfirmEmailAsync(ConfirmEmailRequset model)
+	public async Task<ServiceResult> SendConfirmEmailAsync(ConfirmEmailRequset request)
 	{
-		var user = await userManager.FindByEmailAsync(model.Email);
+		var user = await userManager.FindByEmailAsync(request.Email);
 		if (user is null || await userManager.IsEmailConfirmedAsync(user))
 		{
-			logger.LogDebug("Confirmation email skipped for {Email}: user not found or already confirmed", model.Email);
-			return;
+			logger.LogDebug("Confirmation email skipped for {Email}: user not found or already confirmed", request.Email);
+			return new() { State = ServiceState.Success };
 		}
-		string token =
-			await userManager.GenerateEmailConfirmationTokenAsync(user);
-		string encodedToken =
-	WebEncoders.Base64UrlEncode(
-		Encoding.UTF8.GetBytes(token));
+		string token = await userManager.GenerateEmailConfirmationTokenAsync(user);
+		string encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
 
-		string confirmationLink =
-			$"https://localhost:7103/confirm-email?userId={user.Id}&token={encodedToken}";
+		string confirmationLink = $"https://localhost:7103/confirm-email?userId={user.Id}&token={encodedToken}";
 		logger.LogInformation("Sending confirmation email to {UserId} ({Email})", user.Id, user.Email);
-		await channel.Writer.WriteAsync(new ConfirmEmailJob(user, model.Email, confirmationLink));
+		await channel.Writer.WriteAsync(new ConfirmEmailJob(user, request.Email, confirmationLink));
+		return new() { State = ServiceState.Success };
 	}
-	public async Task<AuthResult> ConfirmEmailAsync(Guid userId, string token)
+	public async Task<ServiceResult> ConfirmEmailAsync(Guid userId, string token)
 	{
 		var user = await userManager.FindByIdAsync(userId.ToString());
 		if (user is null)
 		{
 			logger.LogWarning("Email confirmation failed: user {UserId} not found", userId);
-			return new()
-			{
-				Succeeded = false,
-				Errors = ["user not found."]
-			};
+			return new() { State = ServiceState.NotFound, Message = "user not found." };
 		}
-		token = Encoding.UTF8.GetString(
-			WebEncoders.Base64UrlDecode(token));
+		token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(token));
 
-		var result =
-			await userManager.ConfirmEmailAsync(user, token);
+		var result = await userManager.ConfirmEmailAsync(user, token);
 
 		if (!result.Succeeded)
 		{
@@ -187,48 +177,46 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 							string.Join(", ", result.Errors.Select(e => e.Description)));
 			return new()
 			{
-				Succeeded = false,
-				Errors = [.. result.Errors.Select(e => e.Description)]
+				State = ServiceState.BadRequest,
+				Message = string.Join(", ", result.Errors.Select(e => e.Description))
 			};
 		}
 		logger.LogInformation("Email confirmed for {UserId} ({Email})", user.Id, user.Email);
 		return new()
 		{
-			Succeeded = true
+			State = ServiceState.Success
 		};
 	}
-	public async Task<AuthResult> ResetPasswordAsync(ResetPasswordRequest model)
+	public async Task<ServiceResult> ResetPasswordAsync(ResetPasswordRequest request)
 	{
-		var user = await userManager.FindByIdAsync(model.Id);
+		var user = await userManager.FindByIdAsync(request.Id);
 		if (user is null)
 		{
-			logger.LogWarning("Password reset failed: user {UserId} not found", model.Id);
+			logger.LogWarning("Password reset failed: user {UserId} not found", request.Id);
 			return new()
 			{
-				Succeeded = false,
-				Errors = ["user not found."]
+				State = ServiceState.NotFound,
+				Message = "user not found."
 			};
 		}
-		var token = Encoding.UTF8.GetString(
-			WebEncoders.Base64UrlDecode(model.Token));
-		var result =
-			await userManager.ResetPasswordAsync(user, token, model.NewPassword);
+		var token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
+		var result = await userManager.ResetPasswordAsync(user, token, request.NewPassword);
 		if (!result.Succeeded)
 		{
 			logger.LogError(
 							"Password reset failed for {UserId}. Errors: {Errors}",
-							model.Id,
+							request.Id,
 							string.Join(", ", result.Errors.Select(e => e.Description)));
 			return new()
 			{
-				Succeeded = false,
-				Errors = [.. result.Errors.Select(e => e.Description)]
+				State = ServiceState.BadRequest,
+				Message = string.Join(", ", result.Errors.Select(e => e.Description))
 			};
 		}
 		logger.LogInformation("Password reset successful for {UserId}", user.Id);
 		return new()
 		{
-			Succeeded = true
+			State = ServiceState.Success
 		};
 	}
 }

@@ -5,5 +5,6 @@ namespace Midas.Api.Interfaces;
 
 public interface IPostService
 {
-	Task<PostResponse> CreatePost(CreatePostRequest request);
+	Task<ServiceResult<PostResponse>> CreatePostAsync(CreatePostRequest request);
+	Task<ServiceResult> EditPostAsync(int id, EditPostRequest request);
 }
