@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Midas.Api.Helpers.Responses;
-using Midas.Api.Models.Dtos.Post.Request;
 
 [ApiController]
 [Route("api/[controller]")]

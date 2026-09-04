@@ -1,6 +1,3 @@
-using Midas.Api.Models.Dtos.Post.Request;
-using Midas.Api.Models.Dtos.Post.Response;
-
 namespace Midas.Api.Services;
 
 public class PostService(ApplicationDbContext context, IFileStorage fileStorage, ICurrentUser currentUser) : IPostService

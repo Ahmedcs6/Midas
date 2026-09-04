@@ -7,12 +7,11 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 		var user = await userManager.FindByIdAsync(userId.ToString());
 		if (user is null)
 			return new() { State = ServiceState.NotFound, Message = "User not found." };
-
-		user.FirstName = request.FirstName;
-		user.LastName = request.LastName;
-		user.About = request.About;
-		user.Address = request.Address;
-		user.BirthDate = request.BirthDate;
+		user.FirstName = request.FirstName ?? user.FirstName;
+		user.LastName = request.LastName ?? user.LastName;
+		user.About = request.About ?? user.About;
+		user.Address = request.Address ?? user.Address;
+		user.BirthDate = request.BirthDate ?? user.BirthDate;
 
 		var result = await userManager.UpdateAsync(user);
 

@@ -13,7 +13,7 @@ public class UsersController(ICurrentUser currentUser, IUserService userService)
 		var result = await userService.GetByUserNameAsync(userName);
 		return this.ToActionResult(result);
 	}
-	[HttpPut("me")]
+	[HttpPatch("me")]
 	[Authorize]
 	public async Task<IActionResult> Edit([FromBody] EditUserRequest request)
 	{
