@@ -29,12 +29,22 @@ public class AuthTests(CustomWebApplicationFactory factory)
 
 		};
 	}
+	private static string? _accessToken;
+	private static string? _refreshToken;
+	private async Task LoginAsync()
+	{
+		var loginRequest = CreateLoginRequest();
+		var loginResponse = await _client.PostAsJsonAsync("/api/Auth/login", loginRequest);
+		var loginResult = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<RefreshTokenResponse>>(_jsonSerializerOptions);
+		_accessToken = loginResult!.Data!.AccessToken;
+		_refreshToken = loginResult.Data.RefreshToken;
+	}
 	[Fact]
-	public async Task Registration()
+	public async Task Registre_Should_Return_Ok()
 	{
 		using var scope = _factory.Services.CreateAsyncScope();
 		var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-		await db.Users.Where(u => u.UserName != "Ahmed_cs6_test").ExecuteDeleteAsync();
+		await db.Users.Where(u => u.UserName == "Ahmed_cs7_test").ExecuteDeleteAsync();
 		var request = new RegisterRequest
 		{
 			FirstName = "Ahmed",
@@ -81,12 +91,8 @@ public class AuthTests(CustomWebApplicationFactory factory)
 	[Fact]
 	public async Task RefreshToken_Should_Return_New_Tokens()
 	{
-		var loginRequest = CreateLoginRequest();
-		var loginResponse = await _client.PostAsJsonAsync("/api/Auth/login", loginRequest);
-		var loginResult = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<RefreshTokenResponse>>(_jsonSerializerOptions);
-		Assert.NotNull(loginResult);
-		Assert.NotNull(loginResult.Data);
-		var oldRefreshToken = loginResult.Data.RefreshToken;
+		await LoginAsync();
+		var oldRefreshToken = _refreshToken;
 		for (int i = 0; i < 5; i++)
 		{
 			var refreshResponse = await _client.PostAsJsonAsync("api/Auth/refresh", new RefreshTokenRequest { RefreshToken = oldRefreshToken });
@@ -104,12 +110,8 @@ public class AuthTests(CustomWebApplicationFactory factory)
 	[Fact]
 	public async Task RefreshToken_Should_Reject_Revoked_Token()
 	{
-		var loginRequest = CreateLoginRequest();
-		var loginResponse = await _client.PostAsJsonAsync("/api/Auth/login", loginRequest);
-		var loginResult = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<RefreshTokenResponse>>(_jsonSerializerOptions);
-		Assert.NotNull(loginResult);
-		Assert.NotNull(loginResult.Data);
-		var oldRefreshToken = loginResult.Data.RefreshToken;
+		await LoginAsync();
+		var oldRefreshToken = _refreshToken;
 		var refreshResponse = await _client.PostAsJsonAsync("/api/Auth/refresh", new RefreshTokenRequest { RefreshToken = oldRefreshToken });
 		Assert.Equal(HttpStatusCode.OK, refreshResponse.StatusCode);
 		var reuseResponse = await _client.PostAsJsonAsync("/api/Auth/refresh", new RefreshTokenRequest { RefreshToken = oldRefreshToken });
