@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using Org.BouncyCastle.Utilities.IO;
+
 namespace Midas.Api.Services;
 
 public class PostService(ApplicationDbContext context, IFileStorage fileStorage, ICurrentUser currentUser) : IPostService
@@ -50,5 +53,45 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 		}
 		await context.SaveChangesAsync();
 		return new() { State = ServiceState.Success };
+	}
+	public async Task<ServiceResult> DeletePostAsync(int id)
+	{
+		var result = await context.Posts.Where(p => p.Id == id && p.UserId == currentUser.UserId).ExecuteDeleteAsync();
+		if (result <= 0)
+			return new() { State = ServiceState.NotFound };
+		return new() { State = ServiceState.Success };
+	}
+	public async Task<ServiceResult<PaginationResult<PostResponse, int>>> GetPostsAsync(string userName, int limit, int? cursor)
+	{
+		var userExists = await context.Users.AnyAsync(u => u.UserName == userName);
+		if (!userExists)
+			return new() { State = ServiceState.NotFound, Message = "User Name not found." };
+		var query = context.Posts.AsNoTracking().Where(p => p.User.UserName == userName);
+		if (cursor is not null)
+			query = query.Where(p => p.Id < cursor);
+		var posts = query.OrderByDescending(p => p.Id)
+			.Take(limit + 1)
+			.Select(p => new PostResponse()
+			{
+				Id = p.Id,
+				Content = p.Content,
+				ImageUrl = p.ImageUrl,
+				Privacy = p.Privacy.ToString(),
+				PublishDate = p.PublishDate
+			})
+			.ToList();
+		var hasNext = posts.Count > limit;
+		if (hasNext)
+			posts.RemoveAt(posts.Count - 1);
+
+		return new()
+		{
+			State = ServiceState.Success,
+			Data = new()
+			{
+				Items = posts,
+				NextCursor = hasNext ? posts[^1].Id : null
+			}
+		};
 	}
 }

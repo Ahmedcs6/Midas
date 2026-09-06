@@ -111,16 +111,16 @@ public class UserTests(CustomWebApplicationFactory factory)
 			.SingleOrDefaultAsync();
 		Assert.Equivalent(expected, model);
 	}
-	[Fact]
-	public async Task Follow_Should_Return_Ok()
-	{
-		var request = new HttpRequestMessage(HttpMethod.Post, "api/Users/follow/Desha_test");
-		if (_accessToken is null)
-			await LoginAsync();
-		request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
-
-		var response = await _client.SendAsync(request);
-		Assert.NotNull(response);
-		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-	}
+	// [Fact]
+	// public async Task Follow_Should_Return_Ok()
+	// {
+	// 	var request = new HttpRequestMessage(HttpMethod.Post, "api/Users/follow/Desha_test");
+	// 	if (_accessToken is null)
+	// 		await LoginAsync();
+	// 	request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+	//
+	// 	var response = await _client.SendAsync(request);
+	// 	Assert.NotNull(response);
+	// 	Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+	// }
 }

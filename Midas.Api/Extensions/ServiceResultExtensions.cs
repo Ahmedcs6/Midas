@@ -43,11 +43,11 @@ public static class ServiceResultExtensions
 		};
 	}
 
-	public static IActionResult ToActionResult(this ControllerBase controller, ServiceResult result)
+	public static IActionResult ToActionResult(this ControllerBase controller, ServiceResult result, int successStatusCode = StatusCodes.Status200OK)
 	{
 		return result.State switch
 		{
-			ServiceState.Success => controller.Ok(new ApiResponse<object>
+			ServiceState.Success => controller.StatusCode(successStatusCode, new ApiResponse<object>
 			{
 				Success = true,
 				Message = result.Message
