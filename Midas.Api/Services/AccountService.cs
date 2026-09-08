@@ -133,7 +133,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 
 		var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
 
-		var resetLink = $"https://localhost:7103/reset-password?userId={user.Id}&token={encodedToken}";
+		var resetLink = $"https://Midas.com/reset-password?userId={user.Id}&token={encodedToken}";
 		logger.LogInformation("Password reset link generated for {UserId}", user.Id);
 		await channel.Writer.WriteAsync(new PasswordResetJob(user, request.Email, resetLink));
 		return new()
@@ -152,7 +152,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		string token = await userManager.GenerateEmailConfirmationTokenAsync(user);
 		string encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
 
-		string confirmationLink = $"https://localhost:7103/confirm-email?userId={user.Id}&token={encodedToken}";
+		string confirmationLink = $"https://Midas.com/confirm-email?userId={user.Id}&token={encodedToken}";
 		logger.LogInformation("Sending confirmation email to {UserId} ({Email})", user.Id, user.Email);
 		await channel.Writer.WriteAsync(new ConfirmEmailJob(user, request.Email, confirmationLink));
 		return new() { State = ServiceState.Success };

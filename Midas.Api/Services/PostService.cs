@@ -1,6 +1,3 @@
-using System.ComponentModel;
-using Org.BouncyCastle.Utilities.IO;
-
 namespace Midas.Api.Services;
 
 public class PostService(ApplicationDbContext context, IFileStorage fileStorage, ICurrentUser currentUser) : IPostService
@@ -15,7 +12,7 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 			ImageUrl = fileName,
 			Content = request.Content,
 			Privacy = request.Privacy,
-			UserId = currentUser.UserId
+			UserId = (Guid)currentUser.UserId!
 		};
 		context.Posts.Add(post);
 		await context.SaveChangesAsync();
@@ -38,7 +35,7 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 			return new() { State = ServiceState.NotFound, Message = "Post not found." };
 		if (post.UserId != currentUser.UserId)
 			return new() { State = ServiceState.Forbidden, Message = "You cannot edit this post." };
-		if (request.RemoveImage)
+		if (request.RemoveImage && post.ImageUrl is not null)
 		{
 			await fileStorage.DeleteAsync($"Posts/{post.ImageUrl}");
 			post.ImageUrl = null;
@@ -47,9 +44,9 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 			post.Content = request.Content;
 		if (request.Image is not null)
 		{
+			post.ImageUrl = await fileStorage.SaveAsync(request.Image, "Posts");
 			if (post.ImageUrl is not null)
 				await fileStorage.DeleteAsync($"Posts/{post.ImageUrl}");
-			post.ImageUrl = await fileStorage.SaveAsync(request.Image, "Posts");
 		}
 		await context.SaveChangesAsync();
 		return new() { State = ServiceState.Success };

@@ -44,7 +44,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 
 	public async Task<ServiceResult> Follow(string userName)
 	{
-		var me = await userManager.FindByIdAsync(currentUser.UserId.ToString());
+		var me = await userManager.FindByIdAsync(currentUser.UserId.ToString()!);
 		var user = await userManager.FindByNameAsync(userName);
 
 		if (user is null)

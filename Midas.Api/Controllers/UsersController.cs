@@ -17,13 +17,13 @@ public class UsersController(ICurrentUser currentUser, IUserService userService,
 	[HttpPatch("me")]
 	public async Task<IActionResult> Edit([FromBody] EditUserRequest request)
 	{
-		var result = await userService.EditAsync(currentUser.UserId, request);
+		var result = await userService.EditAsync((Guid)currentUser.UserId!, request);
 		return this.ToActionResult(result);
 	}
 	[HttpPost("me/avatar")]
 	public async Task<IActionResult> EditAvatar([FromForm] EditAvatarRequest request)
 	{
-		var result = await userService.EditAvatarAsync(currentUser.UserId, request);
+		var result = await userService.EditAvatarAsync((Guid)currentUser.UserId!, request);
 		return this.ToActionResult(result);
 	}
 	[HttpPost("follow/{userName}")]
@@ -32,11 +32,11 @@ public class UsersController(ICurrentUser currentUser, IUserService userService,
 		var result = await userService.Follow(userName);
 		return this.ToActionResult(result);
 	}
-	[HttpPost("unfollow/{userName}")]
+	[HttpDelete("follow/{userName}")]
 	public async Task<IActionResult> Unfollow(string userName)
 	{
 		var result = await userService.Unfollow(userName);
-		return this.ToActionResult(result);
+		return this.ToActionResult(result, StatusCodes.Status204NoContent);
 	}
 	[HttpGet("{userName}/posts")]
 	[AllowAnonymous]

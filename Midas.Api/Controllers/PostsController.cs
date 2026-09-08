@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 [Authorize]
 public class PostsController(IPostService postService) : ControllerBase
 {
-	[HttpPost("")]
+	[HttpPost]
 	public async Task<IActionResult> CreatePost(CreatePostRequest request)
 	{
 		var result = await postService.CreatePostAsync(request);
