@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 public class PostsController(IPostService postService) : ControllerBase
 {
 	[HttpPost]
-	public async Task<IActionResult> CreatePost(CreatePostRequest request)
+	public async Task<IActionResult> CreatePost([FromBody] CreatePostRequest request)
 	{
 		var result = await postService.CreatePostAsync(request);
 		return this.ToActionResult(result, StatusCodes.Status201Created);

@@ -12,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<EmailSettings>(
 	builder.Configuration.GetSection("EmailSettings"));
 
+builder.Services.Configure<AppSettings>(
+	builder.Configuration.GetSection("AppSettings"));
+
 builder.Services.AddOptions<JwtSettings>()
 	.Bind(builder.Configuration.GetSection(JwtSettings.SectionName))
 	.ValidateDataAnnotations()

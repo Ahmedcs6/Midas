@@ -44,9 +44,10 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 			post.Content = request.Content;
 		if (request.Image is not null)
 		{
+			var oldImage = post.ImageUrl;
 			post.ImageUrl = await fileStorage.SaveAsync(request.Image, "Posts");
 			if (post.ImageUrl is not null)
-				await fileStorage.DeleteAsync($"Posts/{post.ImageUrl}");
+				await fileStorage.DeleteAsync($"Posts/{oldImage}");
 		}
 		await context.SaveChangesAsync();
 		return new() { State = ServiceState.Success };
@@ -60,13 +61,26 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 	}
 	public async Task<ServiceResult<PaginationResult<PostResponse, int>>> GetPostsAsync(string userName, int limit, int? cursor)
 	{
-		var userExists = await context.Users.AnyAsync(u => u.UserName == userName);
-		if (!userExists)
+		var userId = await context.Users.Where(u => u.UserName == userName).Select(u => (Guid?)u.Id).SingleOrDefaultAsync();
+		if (userId is null)
 			return new() { State = ServiceState.NotFound, Message = "User Name not found." };
+
+		List<PrivacyType> permissions = [PrivacyType.Public];
+
+		var isMe = currentUser.UserId == userId;
+		if (isMe)
+			permissions.AddRange([PrivacyType.Friends, PrivacyType.Private]);
+
+		bool isFollowing = false;
+		if (currentUser.UserId is not null && !isMe)
+			isFollowing = await context.Follows.AnyAsync(f => f.FollowerId == currentUser.UserId && f.FollowingId == userId);
+		if (isFollowing)
+			permissions.Add(PrivacyType.Friends);
 		var query = context.Posts.AsNoTracking().Where(p => p.User.UserName == userName);
 		if (cursor is not null)
 			query = query.Where(p => p.Id < cursor);
-		var posts = query.OrderByDescending(p => p.Id)
+		var posts = query.Where(p => permissions.Contains(p.Privacy))
+			.OrderByDescending(p => p.Id)
 			.Take(limit + 1)
 			.Select(p => new PostResponse()
 			{
