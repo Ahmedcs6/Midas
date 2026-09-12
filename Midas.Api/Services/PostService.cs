@@ -2,7 +2,7 @@ namespace Midas.Api.Services;
 
 public class PostService(ApplicationDbContext context, IFileStorage fileStorage, ICurrentUser currentUser) : IPostService
 {
-	public async Task<ServiceResult<PostResponse>> CreatePostAsync(CreatePostRequest request)
+	public async Task<Result<PostResponse>> CreatePostAsync(CreatePostRequest request)
 	{
 		string? fileName = null;
 		if (request.Image is not null)
@@ -18,7 +18,7 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 		await context.SaveChangesAsync();
 		return new()
 		{
-			State = ServiceState.Success,
+			Success = true,
 			Data = new()
 			{
 				Content = post.Content,
@@ -28,13 +28,13 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 			}
 		};
 	}
-	public async Task<ServiceResult> EditPostAsync(int id, EditPostRequest request)
+	public async Task<Result> EditPostAsync(int id, EditPostRequest request)
 	{
 		var post = await context.Posts.FindAsync(id);
 		if (post is null)
-			return new() { State = ServiceState.NotFound, Message = "Post not found." };
+			return new() { Success = false, Error = ErrorType.NotFound, Message = "Post not found." };
 		if (post.UserId != currentUser.UserId)
-			return new() { State = ServiceState.Forbidden, Message = "You cannot edit this post." };
+			return new() { Success = false, Error = ErrorType.AccessDenied, Message = "You cannot edit this post." };
 		if (request.RemoveImage && post.ImageUrl is not null)
 		{
 			await fileStorage.DeleteAsync($"Posts/{post.ImageUrl}");
@@ -46,24 +46,24 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 		{
 			var oldImage = post.ImageUrl;
 			post.ImageUrl = await fileStorage.SaveAsync(request.Image, "Posts");
-			if (post.ImageUrl is not null)
+			if (oldImage is not null)
 				await fileStorage.DeleteAsync($"Posts/{oldImage}");
 		}
 		await context.SaveChangesAsync();
-		return new() { State = ServiceState.Success };
+		return new() { Success = true };
 	}
-	public async Task<ServiceResult> DeletePostAsync(int id)
+	public async Task<Result> DeletePostAsync(int id)
 	{
 		var result = await context.Posts.Where(p => p.Id == id && p.UserId == currentUser.UserId).ExecuteDeleteAsync();
 		if (result <= 0)
-			return new() { State = ServiceState.NotFound };
-		return new() { State = ServiceState.Success };
+			return new() { Success = false, Error = ErrorType.NotFound };
+		return new() { Success = true };
 	}
-	public async Task<ServiceResult<PaginationResult<PostResponse, int>>> GetPostsAsync(string userName, int limit, int? cursor)
+	public async Task<Result<PaginationResult<PostResponse, int>>> GetPostsAsync(string userName, int limit, int? cursor)
 	{
 		var userId = await context.Users.Where(u => u.UserName == userName).Select(u => (Guid?)u.Id).SingleOrDefaultAsync();
 		if (userId is null)
-			return new() { State = ServiceState.NotFound, Message = "User Name not found." };
+			return new() { Success = false, Error = ErrorType.NotFound, Message = "User Name not found." };
 
 		List<PrivacyType> permissions = [PrivacyType.Public];
 
@@ -97,7 +97,7 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 
 		return new()
 		{
-			State = ServiceState.Success,
+			Success = true,
 			Data = new()
 			{
 				Items = posts,

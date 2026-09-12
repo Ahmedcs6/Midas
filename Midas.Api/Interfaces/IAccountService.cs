@@ -2,10 +2,10 @@ namespace Midas.Api.Interfaces;
 
 public interface IAccountService
 {
-	Task<ServiceResult<UserResponse>> RegisterAsync(RegisterRequest request);
-	Task<ServiceResult<RefreshTokenResponse>> LoginAsync(LoginRequest request);
-	Task<ServiceResult> ForgotPasswordAsync(ForgotPasswordRequest request);
-	Task<ServiceResult> SendConfirmEmailAsync(ConfirmEmailRequset request);
-	Task<ServiceResult> ConfirmEmailAsync(Guid userId, string token);
-	Task<ServiceResult> ResetPasswordAsync(ResetPasswordRequest request);
+	Task<Result<UserResponse>> RegisterAsync(RegisterRequest request);
+	Task<Result<RefreshTokenResponse>> LoginAsync(LoginRequest request);
+	Task<Result> ForgotPasswordAsync(ForgotPasswordRequest request);
+	Task<Result> SendConfirmEmailAsync(ConfirmEmailRequset request);
+	Task<Result> ConfirmEmailAsync(Guid userId, string token);
+	Task<Result> ResetPasswordAsync(ResetPasswordRequest request);
 }

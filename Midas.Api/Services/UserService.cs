@@ -2,11 +2,18 @@ namespace Midas.Api.Services;
 
 public class UserService(UserManager<ApplicationUser> userManager, IFileStorage fileStorage, ICurrentUser currentUser, ApplicationDbContext context) : IUserService
 {
-	public async Task<ServiceResult> EditAsync(Guid userId, EditUserRequest request)
+	public async Task<Result> EditAsync(Guid userId, EditUserRequest request)
 	{
 		var user = await userManager.FindByIdAsync(userId.ToString());
 		if (user is null)
-			return new() { State = ServiceState.NotFound, Message = "User not found." };
+		{
+			return new()
+			{
+				Success = false,
+				Error = ErrorType.NotFound,
+				Message = "User not found."
+			};
+		}
 		user.FirstName = request.FirstName ?? user.FirstName;
 		user.LastName = request.LastName ?? user.LastName;
 		user.About = request.About ?? user.About;
@@ -14,75 +21,140 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 		user.BirthDate = request.BirthDate ?? user.BirthDate;
 
 		var result = await userManager.UpdateAsync(user);
-
 		if (!result.Succeeded)
-			return new() { State = ServiceState.BadRequest, Message = string.Join(", ", result.Errors.Select(e => e.Description)) };
+		{
+			return new()
+			{
+				Success = false,
+				Error = ErrorType.Validation,
+				Message = string.Join(", ", result.Errors.Select(e => e.Description))
+			};
+		}
 
-		return new() { State = ServiceState.Success };
+		return new()
+		{
+			Success = true
+		};
 	}
 
-	public async Task<ServiceResult> EditAvatarAsync(Guid userId, EditAvatarRequest request)
+	public async Task<Result> EditAvatarAsync(Guid userId, EditAvatarRequest request)
 	{
 		var user = await userManager.FindByIdAsync(userId.ToString());
-		if (user is null)
-			return new() { State = ServiceState.NotFound, Message = "User not found." };
 
-		var oldimg = user.ImageUrl;
+		if (user is null)
+		{
+			return new()
+			{
+				Success = false,
+				Error = ErrorType.NotFound,
+				Message = "User not found."
+			};
+		}
+		var oldImage = user.ImageUrl;
 		var fileName = await fileStorage.SaveAsync(request.Image, "Avatars");
 		user.ImageUrl = fileName;
-
 		var result = await userManager.UpdateAsync(user);
-
-		if (oldimg is not null)
-			await fileStorage.DeleteAsync($"Avatars/{oldimg}");
-
 		if (!result.Succeeded)
-			return new() { State = ServiceState.BadRequest, Message = string.Join(", ", result.Errors.Select(e => e.Description)) };
-
-		return new() { State = ServiceState.Success };
+		{
+			await fileStorage.DeleteAsync($"Avatars/{fileName}");
+			return new()
+			{
+				Success = false,
+				Error = ErrorType.Validation,
+				Message = string.Join(", ", result.Errors.Select(e => e.Description))
+			};
+		}
+		if (oldImage is not null)
+			await fileStorage.DeleteAsync($"Avatars/{oldImage}");
+		return new()
+		{
+			Success = true
+		};
 	}
-
-	public async Task<ServiceResult> Follow(string userName)
+	public async Task<Result> Follow(string userName)
 	{
 		var me = await userManager.FindByIdAsync(currentUser.UserId.ToString()!);
 		var user = await userManager.FindByNameAsync(userName);
-
 		if (user is null)
-			return new() { State = ServiceState.NotFound, Message = "User not found." };
-
+		{
+			return new()
+			{
+				Success = false,
+				Error = ErrorType.NotFound,
+				Message = "User not found."
+			};
+		}
 		if (user.Id == me!.Id)
-			return new() { State = ServiceState.BadRequest, Message = "You cannot follow yourself." };
-
+		{
+			return new()
+			{
+				Success = false,
+				Error = ErrorType.Validation,
+				Message = "You cannot follow yourself."
+			};
+		}
 		var follow = new Follow
 		{
-			FollowerId = me!.Id,
+			FollowerId = me.Id,
 			FollowingId = user.Id
 		};
-
 		context.Follows.Add(follow);
-		await context.SaveChangesAsync();
-
-		return new() { State = ServiceState.Success };
+		try
+		{
+			await context.SaveChangesAsync();
+		}
+		catch (DbUpdateException)
+		{
+			return new()
+			{
+				Success = false,
+				Error = ErrorType.Conflict,
+				Message = "You are already following this user."
+			};
+		}
+		return new()
+		{
+			Success = true
+		};
 	}
 
-	public async Task<ServiceResult> Unfollow(string userName)
+	public async Task<Result> Unfollow(string userName)
 	{
 		var user = await userManager.FindByNameAsync(userName);
 
 		if (user is null)
-			return new() { State = ServiceState.NotFound, Message = "User not found." };
+		{
+			return new()
+			{
+				Success = false,
+				Error = ErrorType.NotFound,
+				Message = "User not found."
+			};
+		}
 
 		var result = await context.Follows
-			.Where(f => f.FollowerId == currentUser.UserId && f.FollowingId == user.Id)
+			.Where(f =>
+				f.FollowerId == currentUser.UserId &&
+				f.FollowingId == user.Id)
 			.ExecuteDeleteAsync();
 
 		if (result == 0)
-			return new() { State = ServiceState.NotFound, Message = "Follow relationship not found." };
+		{
+			return new()
+			{
+				Success = false,
+				Error = ErrorType.NotFound,
+				Message = "Follow relationship not found."
+			};
+		}
 
-		return new() { State = ServiceState.Success };
+		return new()
+		{
+			Success = true
+		};
 	}
 
-	public async Task<ServiceResult<UserResponse>> GetByUserNameAsync(string userName)
+	public async Task<Result<UserResponse>> GetByUserNameAsync(string userName)
 	{
 		var user = await context.Users
 			.AsNoTracking()
@@ -101,10 +173,19 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 				FollowingNumber = context.Follows.Count(f => f.FollowerId == u.Id)
 			})
 			.SingleOrDefaultAsync();
-
 		if (user is null)
-			return new() { State = ServiceState.NotFound, Message = "User not found." };
-
-		return new() { State = ServiceState.Success, Data = user };
+		{
+			return new()
+			{
+				Success = false,
+				Error = ErrorType.NotFound,
+				Message = "User not found."
+			};
+		}
+		return new()
+		{
+			Success = true,
+			Data = user
+		};
 	}
 }

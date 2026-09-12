@@ -9,7 +9,7 @@ namespace Midas.Api.Services;
 public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> channel, UserManager<ApplicationUser> userManager, ApplicationDbContext context, IJwtService jwtService, IOptions<AppSettings> settings) : IAccountService
 {
 
-	public async Task<ServiceResult<UserResponse>> RegisterAsync(RegisterRequest request)
+	public async Task<Result<UserResponse>> RegisterAsync(RegisterRequest request)
 	{
 		await using var transaction = await context.Database.BeginTransactionAsync();
 		ApplicationUser user = new()
@@ -30,14 +30,15 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 							string.Join(", ", result.Errors.Select(e => e.Description)));
 			var errors = result.Errors.ToList();
 
-			var state = errors.Any(e =>
+			var error = errors.Any(e =>
 				e.Code is "DuplicateUserName" or "DuplicateEmail")
-				? ServiceState.Conflict
-				: ServiceState.BadRequest;
+				? ErrorType.Conflict
+				: ErrorType.Validation;
 
 			return new()
 			{
-				State = state,
+				Success = false,
+				Error = error,
 				Message = string.Join(", ", errors.Select(e => e.Description))
 			};
 		}
@@ -55,7 +56,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 
 		return new()
 		{
-			State = ServiceState.Success,
+			Success = true,
 			Message = "Register Succeeded, please confirm your email.",
 			Data = new()
 			{
@@ -66,19 +67,19 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			}
 		};
 	}
-	public async Task<ServiceResult<RefreshTokenResponse>> LoginAsync(LoginRequest request)
+	public async Task<Result<RefreshTokenResponse>> LoginAsync(LoginRequest request)
 	{
 		var user = await userManager.FindByEmailAsync(request.Email);
 		if (user is not null && !await userManager.IsEmailConfirmedAsync(user))
 		{
 			logger.LogWarning("Login blocked: email not confirmed for {Email}", request.Email);
-			return new() { State = ServiceState.Forbidden, Message = "Please confirm your email." };
+			return new() { Success = false, Error = ErrorType.AccessDenied, Message = "Please confirm your email." };
 		}
 
 		if (user is null || !await userManager.CheckPasswordAsync(user, request.Password))
 		{
 			logger.LogWarning("Failed login attempt for {Email}", request.Email);
-			return new() { State = ServiceState.Unauthorized, Message = "Invalid email or password." };
+			return new() { Success = false, Error = ErrorType.AuthenticationRequired, Message = "Invalid email or password." };
 		}
 		logger.LogInformation("User logged in: {UserId} ({Email}) from client {Client}", user.Id, user.Email, request.Client);
 		await context.RefreshTokens
@@ -103,7 +104,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		logger.LogInformation("Issued new refresh token for {UserId}, expires {ExpiresAt:O}", user.Id, refreshToken.ExpiresAt);
 		return new()
 		{
-			State = ServiceState.Success,
+			Success = true,
 			Data = new()
 			{
 				AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
@@ -113,20 +114,21 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			}
 		};
 	}
-	public async Task<ServiceResult> ForgotPasswordAsync(ForgotPasswordRequest request)
+	public async Task<Result> ForgotPasswordAsync(ForgotPasswordRequest request)
 	{
 		var user = await userManager.FindByEmailAsync(request.Email);
 		if (user is null)
 		{
 			logger.LogInformation("Password reset requested for non-existent email: {Email}", request.Email);
-			return new() { State = ServiceState.Success };
+			return new() { Success = true };
 		}
 		if (!await userManager.IsEmailConfirmedAsync(user))
 		{
 			logger.LogWarning("Password reset blocked: email not confirmed for {UserId}", user.Id);
 			return new()
 			{
-				State = ServiceState.Forbidden,
+				Success = false,
+				Error = ErrorType.AccessDenied,
 				Message = "Please confirm your Email."
 			};
 		}
@@ -139,16 +141,16 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		await channel.Writer.WriteAsync(new PasswordResetJob(user, request.Email, resetLink));
 		return new()
 		{
-			State = ServiceState.Success
+			Success = true
 		};
 	}
-	public async Task<ServiceResult> SendConfirmEmailAsync(ConfirmEmailRequset request)
+	public async Task<Result> SendConfirmEmailAsync(ConfirmEmailRequset request)
 	{
 		var user = await userManager.FindByEmailAsync(request.Email);
 		if (user is null || await userManager.IsEmailConfirmedAsync(user))
 		{
 			logger.LogDebug("Confirmation email skipped for {Email}: user not found or already confirmed", request.Email);
-			return new() { State = ServiceState.Success };
+			return new() { Success = true };
 		}
 		string token = await userManager.GenerateEmailConfirmationTokenAsync(user);
 		string encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
@@ -156,15 +158,15 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		string confirmationLink = $"{settings.Value.BaseUrl}/confirm-email?userId={user.Id}&token={encodedToken}";
 		logger.LogInformation("Sending confirmation email to {UserId} ({Email})", user.Id, user.Email);
 		await channel.Writer.WriteAsync(new ConfirmEmailJob(user, request.Email, confirmationLink));
-		return new() { State = ServiceState.Success };
+		return new() { Success = true };
 	}
-	public async Task<ServiceResult> ConfirmEmailAsync(Guid userId, string token)
+	public async Task<Result> ConfirmEmailAsync(Guid userId, string token)
 	{
 		var user = await userManager.FindByIdAsync(userId.ToString());
 		if (user is null)
 		{
 			logger.LogWarning("Email confirmation failed: user {UserId} not found", userId);
-			return new() { State = ServiceState.NotFound, Message = "user not found." };
+			return new() { Success = false, Error = ErrorType.NotFound, Message = "user not found." };
 		}
 		token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(token));
 
@@ -178,17 +180,18 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 							string.Join(", ", result.Errors.Select(e => e.Description)));
 			return new()
 			{
-				State = ServiceState.BadRequest,
+				Success = false,
+				Error = ErrorType.Validation,
 				Message = string.Join(", ", result.Errors.Select(e => e.Description))
 			};
 		}
 		logger.LogInformation("Email confirmed for {UserId} ({Email})", user.Id, user.Email);
 		return new()
 		{
-			State = ServiceState.Success
+			Success = true
 		};
 	}
-	public async Task<ServiceResult> ResetPasswordAsync(ResetPasswordRequest request)
+	public async Task<Result> ResetPasswordAsync(ResetPasswordRequest request)
 	{
 		var user = await userManager.FindByIdAsync(request.Id);
 		if (user is null)
@@ -196,7 +199,8 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			logger.LogWarning("Password reset failed: user {UserId} not found", request.Id);
 			return new()
 			{
-				State = ServiceState.NotFound,
+				Success = false,
+				Error = ErrorType.NotFound,
 				Message = "user not found."
 			};
 		}
@@ -210,14 +214,15 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 							string.Join(", ", result.Errors.Select(e => e.Description)));
 			return new()
 			{
-				State = ServiceState.BadRequest,
+				Success = false,
+				Error = ErrorType.Validation,
 				Message = string.Join(", ", result.Errors.Select(e => e.Description))
 			};
 		}
 		logger.LogInformation("Password reset successful for {UserId}", user.Id);
 		return new()
 		{
-			State = ServiceState.Success
+			Success = true
 		};
 	}
 }

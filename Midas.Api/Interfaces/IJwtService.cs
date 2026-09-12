@@ -6,5 +6,5 @@ public interface IJwtService
 {
 	Task<JwtSecurityToken> CreateJwtTokenAsync(ApplicationUser user);
 	byte[] GenerateRefreshToken();
-	Task<ServiceResult<RefreshTokenResponse>> RefreshAsync(RefreshTokenRequest model);
+	Task<Result<RefreshTokenResponse>> RefreshAsync(RefreshTokenRequest model);
 }

@@ -57,7 +57,7 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 		logger.LogTrace("Generated refresh token bytes");
 		return bytes;
 	}
-	public async Task<ServiceResult<RefreshTokenResponse>> RefreshAsync(RefreshTokenRequest model)
+	public async Task<Result<RefreshTokenResponse>> RefreshAsync(RefreshTokenRequest model)
 	{
 		var bytes = Convert.FromBase64String(model.RefreshToken);
 		var hash = Convert.ToBase64String(SHA256.HashData(bytes));
@@ -74,7 +74,8 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 
 			return new()
 			{
-				State = ServiceState.Unauthorized,
+				Success = false,
+				Error = ErrorType.Validation,
 				Message = "Invalid token."
 			};
 		}
@@ -90,7 +91,8 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 
 			return new()
 			{
-				State = ServiceState.Unauthorized,
+				Success = false,
+				Error = ErrorType.Validation,
 				Message = "Expired token."
 			};
 		}
@@ -126,7 +128,8 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 
 			return new()
 			{
-				State = ServiceState.Unauthorized,
+				Success = false,
+				Error = ErrorType.AuthenticationRequired,
 				Message = "Revoked token."
 			};
 		}
@@ -159,7 +162,7 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 
 		return new()
 		{
-			State = ServiceState.Success,
+			Success = true,
 			Data = new()
 			{
 				AccessToken = new JwtSecurityTokenHandler().WriteToken(accessToken),
