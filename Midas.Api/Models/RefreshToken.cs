@@ -5,7 +5,7 @@ public class RefreshToken
 {
 	public int Id { get; set; }
 
-	public ClientType Client { get; set; }
+	public Client Client { get; set; }
 
 	public string TokenHash { get; set; } = "";
 

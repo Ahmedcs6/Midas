@@ -8,7 +8,6 @@ using Microsoft.IdentityModel.Tokens;
 using Midas.Api.Middlewares;
 var builder = WebApplication.CreateBuilder(args);
 
-
 builder.Services.Configure<EmailSettings>(
 	builder.Configuration.GetSection("EmailSettings"));
 

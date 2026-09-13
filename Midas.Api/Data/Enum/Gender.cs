@@ -1,6 +1,6 @@
 namespace Midas.Api.Data.Enum;
 
-public enum GenderType
+public enum Gender
 {
 	Male,
 	Female

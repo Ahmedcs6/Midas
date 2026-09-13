@@ -1,6 +1,6 @@
 namespace Midas.Api.Data.Enum;
 
-public enum ErrorType
+public enum Error
 {
 	Validation,
 	AuthenticationRequired,

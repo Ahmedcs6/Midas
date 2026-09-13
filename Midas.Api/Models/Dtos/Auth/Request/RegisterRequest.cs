@@ -7,7 +7,7 @@ public class RegisterRequest
 	[Required]
 	public string LastName { get; set; } = string.Empty;
 	[Required]
-	public GenderType Gender { get; set; } = 0;
+	public Gender Gender { get; set; } = 0;
 	[Required]
 	public string UserName { get; set; } = string.Empty;
 	[Required, EmailAddress]

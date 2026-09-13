@@ -3,7 +3,7 @@ namespace Midas.Api.Models.Dtos;
 public class Result
 {
 	public bool Success { get; set; }
-	public ErrorType Error { get; init; }
+	public Error Error { get; init; }
 	public string? Message { get; init; }
 }
 

@@ -32,9 +32,9 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 	{
 		var post = await context.Posts.FindAsync(id);
 		if (post is null)
-			return new() { Success = false, Error = ErrorType.NotFound, Message = "Post not found." };
+			return new() { Success = false, Error = Error.NotFound, Message = "Post not found." };
 		if (post.UserId != currentUser.UserId)
-			return new() { Success = false, Error = ErrorType.AccessDenied, Message = "You cannot edit this post." };
+			return new() { Success = false, Error = Error.AccessDenied, Message = "You cannot edit this post." };
 		if (request.RemoveImage && post.ImageUrl is not null)
 		{
 			await fileStorage.DeleteAsync($"Posts/{post.ImageUrl}");
@@ -56,26 +56,26 @@ public class PostService(ApplicationDbContext context, IFileStorage fileStorage,
 	{
 		var result = await context.Posts.Where(p => p.Id == id && p.UserId == currentUser.UserId).ExecuteDeleteAsync();
 		if (result <= 0)
-			return new() { Success = false, Error = ErrorType.NotFound };
+			return new() { Success = false, Error = Error.NotFound };
 		return new() { Success = true };
 	}
 	public async Task<Result<PaginationResult<PostResponse, int>>> GetPostsAsync(string userName, int limit, int? cursor)
 	{
 		var userId = await context.Users.Where(u => u.UserName == userName).Select(u => (Guid?)u.Id).SingleOrDefaultAsync();
 		if (userId is null)
-			return new() { Success = false, Error = ErrorType.NotFound, Message = "User Name not found." };
+			return new() { Success = false, Error = Error.NotFound, Message = "User Name not found." };
 
-		List<PrivacyType> permissions = [PrivacyType.Public];
+		List<Privacy> permissions = [Privacy.Public];
 
 		var isMe = currentUser.UserId == userId;
 		if (isMe)
-			permissions.AddRange([PrivacyType.Friends, PrivacyType.Private]);
+			permissions.AddRange([Privacy.Friends, Privacy.Private]);
 
 		bool isFollowing = false;
 		if (currentUser.UserId is not null && !isMe)
 			isFollowing = await context.Follows.AnyAsync(f => f.FollowerId == currentUser.UserId && f.FollowingId == userId);
 		if (isFollowing)
-			permissions.Add(PrivacyType.Friends);
+			permissions.Add(Privacy.Friends);
 		var query = context.Posts.AsNoTracking().Where(p => p.User.UserName == userName);
 		if (cursor is not null)
 			query = query.Where(p => p.Id < cursor);

@@ -7,5 +7,5 @@ public class LoginRequest
 	[Required]
 	public string Password { get; set; } = string.Empty;
 	[Required]
-	public ClientType Client { get; set; }
+	public Client Client { get; set; }
 }

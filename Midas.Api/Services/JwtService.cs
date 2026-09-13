@@ -75,7 +75,7 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.Validation,
+				Error = Error.Validation,
 				Message = "Invalid token."
 			};
 		}
@@ -92,7 +92,7 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.Validation,
+				Error = Error.Validation,
 				Message = "Expired token."
 			};
 		}
@@ -129,7 +129,7 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.AuthenticationRequired,
+				Error = Error.AuthenticationRequired,
 				Message = "Revoked token."
 			};
 		}

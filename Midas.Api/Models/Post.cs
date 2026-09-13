@@ -10,7 +10,7 @@ public class Post
 
 	public string? ImageUrl { get; set; }
 
-	public PrivacyType Privacy { get; set; }
+	public Privacy Privacy { get; set; }
 
 	public ICollection<Comment> Comments { get; set; } = [];
 

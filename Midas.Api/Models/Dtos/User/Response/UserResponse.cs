@@ -10,7 +10,7 @@ public class UserResponse
 
 	public DateOnly? BirthDate { get; set; }
 
-	public GenderType? Gender { get; set; }
+	public Gender? Gender { get; set; }
 
 	public string? About { get; set; }
 

@@ -32,8 +32,8 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 
 			var error = errors.Any(e =>
 				e.Code is "DuplicateUserName" or "DuplicateEmail")
-				? ErrorType.Conflict
-				: ErrorType.Validation;
+				? Error.Conflict
+				: Error.Validation;
 
 			return new()
 			{
@@ -73,13 +73,13 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		if (user is not null && !await userManager.IsEmailConfirmedAsync(user))
 		{
 			logger.LogWarning("Login blocked: email not confirmed for {Email}", request.Email);
-			return new() { Success = false, Error = ErrorType.AccessDenied, Message = "Please confirm your email." };
+			return new() { Success = false, Error = Error.AccessDenied, Message = "Please confirm your email." };
 		}
 
 		if (user is null || !await userManager.CheckPasswordAsync(user, request.Password))
 		{
 			logger.LogWarning("Failed login attempt for {Email}", request.Email);
-			return new() { Success = false, Error = ErrorType.AuthenticationRequired, Message = "Invalid email or password." };
+			return new() { Success = false, Error = Error.AuthenticationRequired, Message = "Invalid email or password." };
 		}
 		logger.LogInformation("User logged in: {UserId} ({Email}) from client {Client}", user.Id, user.Email, request.Client);
 		await context.RefreshTokens
@@ -128,7 +128,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.AccessDenied,
+				Error = Error.AccessDenied,
 				Message = "Please confirm your Email."
 			};
 		}
@@ -166,7 +166,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		if (user is null)
 		{
 			logger.LogWarning("Email confirmation failed: user {UserId} not found", userId);
-			return new() { Success = false, Error = ErrorType.NotFound, Message = "user not found." };
+			return new() { Success = false, Error = Error.NotFound, Message = "user not found." };
 		}
 		token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(token));
 
@@ -181,7 +181,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.Validation,
+				Error = Error.Validation,
 				Message = string.Join(", ", result.Errors.Select(e => e.Description))
 			};
 		}
@@ -200,7 +200,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.NotFound,
+				Error = Error.NotFound,
 				Message = "user not found."
 			};
 		}
@@ -215,7 +215,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.Validation,
+				Error = Error.Validation,
 				Message = string.Join(", ", result.Errors.Select(e => e.Description))
 			};
 		}

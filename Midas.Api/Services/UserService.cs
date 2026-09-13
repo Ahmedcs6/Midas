@@ -10,7 +10,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.NotFound,
+				Error = Error.NotFound,
 				Message = "User not found."
 			};
 		}
@@ -26,7 +26,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.Validation,
+				Error = Error.Validation,
 				Message = string.Join(", ", result.Errors.Select(e => e.Description))
 			};
 		}
@@ -46,7 +46,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.NotFound,
+				Error = Error.NotFound,
 				Message = "User not found."
 			};
 		}
@@ -60,7 +60,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.Validation,
+				Error = Error.Validation,
 				Message = string.Join(", ", result.Errors.Select(e => e.Description))
 			};
 		}
@@ -80,7 +80,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.NotFound,
+				Error = Error.NotFound,
 				Message = "User not found."
 			};
 		}
@@ -89,7 +89,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.Validation,
+				Error = Error.Validation,
 				Message = "You cannot follow yourself."
 			};
 		}
@@ -108,7 +108,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.Conflict,
+				Error = Error.Conflict,
 				Message = "You are already following this user."
 			};
 		}
@@ -127,7 +127,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.NotFound,
+				Error = Error.NotFound,
 				Message = "User not found."
 			};
 		}
@@ -143,7 +143,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.NotFound,
+				Error = Error.NotFound,
 				Message = "Follow relationship not found."
 			};
 		}
@@ -178,7 +178,7 @@ public class UserService(UserManager<ApplicationUser> userManager, IFileStorage 
 			return new()
 			{
 				Success = false,
-				Error = ErrorType.NotFound,
+				Error = Error.NotFound,
 				Message = "User not found."
 			};
 		}

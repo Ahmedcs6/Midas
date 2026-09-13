@@ -1,6 +1,6 @@
 namespace Midas.Api.Data.Enum;
 
-public enum PrivacyType
+public enum Privacy
 {
 	Public,
 	Friends,

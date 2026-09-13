@@ -18,21 +18,21 @@ public static class ResultExtensions
 				})
 			: result.Error switch
 			{
-				ErrorType.Validation => controller.BadRequest(
+				Error.Validation => controller.BadRequest(
 					new ApiResponse<T>
 					{
 						Success = false,
 						Message = result.Message
 					}),
 
-				ErrorType.AuthenticationRequired => controller.Unauthorized(
+				Error.AuthenticationRequired => controller.Unauthorized(
 					new ApiResponse<T>
 					{
 						Success = false,
 						Message = result.Message
 					}),
 
-				ErrorType.AccessDenied => controller.StatusCode(
+				Error.AccessDenied => controller.StatusCode(
 					StatusCodes.Status403Forbidden,
 					new ApiResponse<T>
 					{
@@ -40,14 +40,14 @@ public static class ResultExtensions
 						Message = result.Message
 					}),
 
-				ErrorType.NotFound => controller.NotFound(
+				Error.NotFound => controller.NotFound(
 					new ApiResponse<T>
 					{
 						Success = false,
 						Message = result.Message
 					}),
 
-				ErrorType.Conflict => controller.Conflict(
+				Error.Conflict => controller.Conflict(
 					new ApiResponse<T>
 					{
 						Success = false,
@@ -70,21 +70,21 @@ public static class ResultExtensions
 				})
 			: result.Error switch
 			{
-				ErrorType.Validation => controller.BadRequest(
+				Error.Validation => controller.BadRequest(
 					new ApiResponse<object>
 					{
 						Success = false,
 						Message = result.Message
 					}),
 
-				ErrorType.AuthenticationRequired => controller.Unauthorized(
+				Error.AuthenticationRequired => controller.Unauthorized(
 					new ApiResponse<object>
 					{
 						Success = false,
 						Message = result.Message
 					}),
 
-				ErrorType.AccessDenied => controller.StatusCode(
+				Error.AccessDenied => controller.StatusCode(
 					StatusCodes.Status403Forbidden,
 					new ApiResponse<object>
 					{
@@ -92,14 +92,14 @@ public static class ResultExtensions
 						Message = result.Message
 					}),
 
-				ErrorType.NotFound => controller.NotFound(
+				Error.NotFound => controller.NotFound(
 					new ApiResponse<object>
 					{
 						Success = false,
 						Message = result.Message
 					}),
 
-				ErrorType.Conflict => controller.Conflict(
+				Error.Conflict => controller.Conflict(
 					new ApiResponse<object>
 					{
 						Success = false,
