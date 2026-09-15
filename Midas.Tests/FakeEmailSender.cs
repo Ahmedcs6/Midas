@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Midas.Api.Interfaces;
 using Midas.Api.Models.Dtos;
@@ -5,9 +6,13 @@ namespace Midas.Tests;
 
 public class FakeEmailSender(ILogger<FakeEmailSender> logger) : IEmailSender
 {
-	public async Task SendAsync(IEmailJob job, CancellationToken cancellationToken)
+	public readonly ConcurrentBag<IEmailJob> Sent = [];
+
+	public void Clear() => Sent.Clear();
+
+	public Task SendAsync(IEmailJob job, CancellationToken cancellationToken)
 	{
-		// await Task.Delay(100);
+		Sent.Add(job);
 		switch (job)
 		{
 			case ConfirmEmailJob confirm:
@@ -29,5 +34,6 @@ public class FakeEmailSender(ILogger<FakeEmailSender> logger) : IEmailSender
 					$"Unsupported email job: {job.GetType().Name}");
 		}
 
+		return Task.CompletedTask;
 	}
 }

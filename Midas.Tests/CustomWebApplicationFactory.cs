@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Midas.Api.Interfaces;
 
 namespace Midas.Tests;
@@ -18,9 +19,14 @@ public class CustomWebApplicationFactory
 			config.AddUserSecrets<Program>(
 				optional: false);
 		});
-		builder.ConfigureServices(options =>
+		builder.ConfigureServices(services =>
 		{
-			options.AddScoped<IEmailSender, FakeEmailSender>();
+			// Replace (not duplicate) the real EmailSender so tests never hit SMTP.
+			// Singleton Fake doubles as a spy: tests can assert channel jobs were sent.
+			// EmailWorker (BackgroundService) is intentionally kept running.
+			services.RemoveAll<IEmailSender>();
+			services.AddSingleton<FakeEmailSender>();
+			services.AddScoped<IEmailSender>(sp => sp.GetRequiredService<FakeEmailSender>());
 		});
 	}
 }

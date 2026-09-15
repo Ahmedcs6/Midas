@@ -1,56 +1,30 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text.Json;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Midas.Api.Data;
 using Midas.Api.Helpers.Responses;
-using Midas.Api.Models.Dtos.Auth.Request;
-using Midas.Api.Models.Dtos.Auth.Response;
 using Midas.Api.Models.Dtos.User.Request;
 using Midas.Api.Models.Dtos.User.Response;
 
 namespace Midas.Tests;
 
 [Collection("Api collection")]
-public class UserTests(CustomWebApplicationFactory factory)
+public class UserTests(CustomWebApplicationFactory factory) : ApiTestBase(factory)
 {
-	private readonly CustomWebApplicationFactory _factory = factory;
-	private readonly HttpClient _client = factory.CreateClient();
-	private readonly JsonSerializerOptions _jsonSerializerOptions = new()
-	{
-		PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-	};
-	private static LoginRequest CreateLoginRequest(string email = "ahmed_test6@example.com", string password = "Ahmed_cs6")
-	{
-		return new LoginRequest
-		{
-			Email = email,
-			Client = 0,
-			Password = password
-
-		};
-	}
-	private static string? _accessToken { get; set; }
-	private async Task LoginAsync()
-	{
-		var loginRequest = CreateLoginRequest();
-		var loginResponse = await _client.PostAsJsonAsync("/api/Auth/login", loginRequest);
-		var loginResult = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<RefreshTokenResponse>>(_jsonSerializerOptions);
-		_accessToken = loginResult!.Data!.AccessToken;
-	}
 	[Fact]
 	public async Task GetUser_Should_Return_Ok()
 	{
-		var response = await _client.GetAsync("api/Users/Ahmed_cs6_test");
+		using var client = CreateClient();
+		await TestHelpers.EnsureUserAsync(Factory.Services);
+		var response = await client.GetAsync("/api/Users/Ahmed_cs6_test");
 		Assert.NotNull(response);
 		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-		var result = await response.Content.ReadFromJsonAsync<ApiResponse<UserResponse>>(_jsonSerializerOptions);
+		var result = await response.Content.ReadFromJsonAsync<ApiResponse<UserResponse>>(JsonOptions);
 		Assert.NotNull(result);
 		Assert.NotNull(result.Data);
-		await using var scope = _factory.Services.CreateAsyncScope();
+		await using var scope = Factory.Services.CreateAsyncScope();
 		var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 		var expected = await db.Users
 			.AsNoTracking()
@@ -71,9 +45,11 @@ public class UserTests(CustomWebApplicationFactory factory)
 			.SingleOrDefaultAsync();
 		Assert.Equivalent(expected, result.Data);
 	}
+
 	[Fact]
 	public async Task EditUser_Should_Return_Ok()
 	{
+		using var client = CreateClient();
 		EditUserRequest model = new()
 		{
 			About = Guid.NewGuid().ToString(),
@@ -86,18 +62,17 @@ public class UserTests(CustomWebApplicationFactory factory)
 			},
 			BirthDate = DateOnly.Parse("6-12-2005")
 		};
-		var request = new HttpRequestMessage(HttpMethod.Patch, "api/Users/me")
+		var (accessToken, _) = await LoginAsMainAsync(client);
+		var request = new HttpRequestMessage(HttpMethod.Patch, "/api/Users/me")
 		{
 			Content = JsonContent.Create(model)
 		};
-		if (_accessToken is null)
-			await LoginAsync();
-		request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+		request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-		var response = await _client.SendAsync(request);
+		var response = await client.SendAsync(request);
 		Assert.NotNull(response);
 		Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-		await using var scope = _factory.Services.CreateAsyncScope();
+		await using var scope = Factory.Services.CreateAsyncScope();
 		var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 		var expected = await db.Users
 			.AsNoTracking()
@@ -111,16 +86,4 @@ public class UserTests(CustomWebApplicationFactory factory)
 			.SingleOrDefaultAsync();
 		Assert.Equivalent(expected, model);
 	}
-	// [Fact]
-	// public async Task Follow_Should_Return_Ok()
-	// {
-	// 	var request = new HttpRequestMessage(HttpMethod.Post, "api/Users/follow/Desha_test");
-	// 	if (_accessToken is null)
-	// 		await LoginAsync();
-	// 	request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
-	//
-	// 	var response = await _client.SendAsync(request);
-	// 	Assert.NotNull(response);
-	// 	Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-	// }
 }
