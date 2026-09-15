@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Midas.Api.Configuration;
+namespace Midas.Api.Configurations;
 
-public class NotificationEntityTypeConfiguration : IEntityTypeConfiguration<Notification>
+public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
 {
 	public void Configure(EntityTypeBuilder<Notification> builder)
 	{
@@ -23,5 +23,7 @@ public class NotificationEntityTypeConfiguration : IEntityTypeConfiguration<Noti
 			.WithMany(u => u.Notifications)
 			.HasForeignKey(n => n.UserId)
 			.OnDelete(DeleteBehavior.Cascade);
+
+		builder.HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
 	}
 }

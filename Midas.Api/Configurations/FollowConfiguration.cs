@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-namespace Midas.Api.Configuration;
+namespace Midas.Api.Configurations;
 
-public class FollowEntityTypeConfiguration : IEntityTypeConfiguration<Follow>
+public class FollowConfiguration : IEntityTypeConfiguration<Follow>
 {
 	public void Configure(EntityTypeBuilder<Follow> builder)
 	{

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-namespace Midas.Api.Configuration;
+namespace Midas.Api.Configurations;
 
-public class ReactEntityTypeConfiguration : IEntityTypeConfiguration<React>
+public class ReactConfiguration : IEntityTypeConfiguration<React>
 {
 	public void Configure(EntityTypeBuilder<React> builder)
 	{
@@ -18,5 +18,7 @@ public class ReactEntityTypeConfiguration : IEntityTypeConfiguration<React>
 			.WithMany(u => u.Reacts)
 			.HasForeignKey(r => r.UserId)
 			.OnDelete(DeleteBehavior.NoAction);
+
+		builder.HasIndex(r => r.PostId);
 	}
 }

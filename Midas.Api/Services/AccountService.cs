@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace Midas.Api.Services;
 
-public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> channel, UserManager<ApplicationUser> userManager, ApplicationDbContext context, IJwtService jwtService, IOptions<AppSettings> settings) : IAccountService
+public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> channel, UserManager<ApplicationUser> userManager, ApplicationDbContext context, IJwtService jwtService, IOptions<AppSettings> settings, IClientInfoProvider clientInfoProvider) : IAccountService
 {
 
 	public async Task<Result<UserResponse>> RegisterAsync(RegisterRequest request)
@@ -73,35 +73,54 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		if (user is not null && !await userManager.IsEmailConfirmedAsync(user))
 		{
 			logger.LogWarning("Login blocked: email not confirmed for {Email}", request.Email);
-			return new() { Success = false, Error = Error.AccessDenied, Message = "Please confirm your email." };
+			return new()
+			{
+				Success = false,
+				Error = Error.AccessDenied,
+				Message = "Please confirm your email."
+			};
 		}
-
 		if (user is null || !await userManager.CheckPasswordAsync(user, request.Password))
 		{
 			logger.LogWarning("Failed login attempt for {Email}", request.Email);
-			return new() { Success = false, Error = Error.AuthenticationRequired, Message = "Invalid email or password." };
+			return new()
+			{
+				Success = false,
+				Error = Error.AuthenticationRequired,
+				Message = "Invalid email or password."
+			};
 		}
-		logger.LogInformation("User logged in: {UserId} ({Email}) from client {Client}", user.Id, user.Email, request.Client);
-		await context.RefreshTokens
-						.Where(t => t.ApplicationUserId == user.Id && t.Client == request.Client &&
-									t.RevokedAt == null)
-						.ExecuteUpdateAsync(setters =>
-							setters.SetProperty(
-								t => t.RevokedAt,
-								DateTime.UtcNow));
-		logger.LogDebug("Revoked previous refresh tokens for {UserId} on client {Client}", user.Id, request.Client);
-		var token = await jwtService.CreateJwtTokenAsync(user);
+		var clientInfo = clientInfoProvider.GetClientInfo();
+		var session = new Session
+		{
+			UserId = user.Id,
+			Client = request.Client,
+			OperatingSystem = clientInfo.OS.Family,
+			Browser = clientInfo.UA.Family
+		};
 		var bytes = jwtService.GenerateRefreshToken();
 		var refreshToken = new RefreshToken
 		{
+			Session = session,
 			TokenHash = Convert.ToBase64String(SHA256.HashData(bytes)),
-			ExpiresAt = DateTime.UtcNow.AddDays(30),
-			Client = request.Client,
-			ApplicationUserId = user.Id
+			ExpiresAt = DateTime.UtcNow.AddDays(30)
 		};
 		context.RefreshTokens.Add(refreshToken);
+
 		await context.SaveChangesAsync();
-		logger.LogInformation("Issued new refresh token for {UserId}, expires {ExpiresAt:O}", user.Id, refreshToken.ExpiresAt);
+		var token = await jwtService.CreateJwtTokenAsync(user, session.Id);
+
+		logger.LogInformation(
+			"User logged in: {UserId} ({Email}) from client {Client}",
+			user.Id,
+			user.Email,
+			request.Client);
+
+		logger.LogInformation(
+			"Issued new refresh token for {UserId}, expires {ExpiresAt:O}",
+			user.Id,
+			refreshToken.ExpiresAt);
+
 		return new()
 		{
 			Success = true,
@@ -144,7 +163,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			Success = true
 		};
 	}
-	public async Task<Result> SendConfirmEmailAsync(ConfirmEmailRequset request)
+	public async Task<Result> SendConfirmEmailAsync(ConfirmEmailRequest request)
 	{
 		var user = await userManager.FindByEmailAsync(request.Email);
 		if (user is null || await userManager.IsEmailConfirmedAsync(user))
@@ -168,9 +187,18 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 			logger.LogWarning("Email confirmation failed: user {UserId} not found", userId);
 			return new() { Success = false, Error = Error.NotFound, Message = "user not found." };
 		}
-		token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(token));
+		string decodedToken;
+		try
+		{
+			decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(token));
+		}
+		catch (FormatException)
+		{
+			logger.LogWarning("Email confirmation failed: malformed token for {UserId}", userId);
+			return new() { Success = false, Error = Error.Validation, Message = "Invalid token." };
+		}
 
-		var result = await userManager.ConfirmEmailAsync(user, token);
+		var result = await userManager.ConfirmEmailAsync(user, decodedToken);
 
 		if (!result.Succeeded)
 		{
@@ -193,7 +221,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 	}
 	public async Task<Result> ResetPasswordAsync(ResetPasswordRequest request)
 	{
-		var user = await userManager.FindByIdAsync(request.Id);
+		var user = await userManager.FindByIdAsync(request.Id.ToString());
 		if (user is null)
 		{
 			logger.LogWarning("Password reset failed: user {UserId} not found", request.Id);
@@ -204,7 +232,21 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 				Message = "user not found."
 			};
 		}
-		var token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
+		string token;
+		try
+		{
+			token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
+		}
+		catch (FormatException)
+		{
+			logger.LogWarning("Password reset failed: malformed token for {UserId}", request.Id);
+			return new()
+			{
+				Success = false,
+				Error = Error.Validation,
+				Message = "Invalid token."
+			};
+		}
 		var result = await userManager.ResetPasswordAsync(user, token, request.NewPassword);
 		if (!result.Succeeded)
 		{

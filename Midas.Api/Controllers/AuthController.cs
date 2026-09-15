@@ -19,7 +19,7 @@ public class AuthController(IAccountService accountService, IJwtService jwtServi
 		return this.ToActionResult(result);
 	}
 	[HttpPost("resend-confirm-email")]
-	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailRequset request)
+	public async Task<IActionResult> ResendConfirmEmail([FromBody] ConfirmEmailRequest request)
 	{
 		var result = await accountService.SendConfirmEmailAsync(request);
 		return this.ToActionResult(result);

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-namespace Midas.Api.Configuration;
+namespace Midas.Api.Configurations;
 
-public class PostEntityTypeConfiguration : IEntityTypeConfiguration<Post>
+public class PostConfiguration : IEntityTypeConfiguration<Post>
 {
 	public void Configure(EntityTypeBuilder<Post> builder)
 	{
@@ -17,5 +17,7 @@ public class PostEntityTypeConfiguration : IEntityTypeConfiguration<Post>
 			   .WithMany(u => u.Posts)
 			   .HasForeignKey(p => p.UserId)
 			   .OnDelete(DeleteBehavior.Cascade);
+
+		builder.HasIndex(p => p.PublishDate);
 	}
 }

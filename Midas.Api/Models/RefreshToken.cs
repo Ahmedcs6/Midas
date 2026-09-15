@@ -3,11 +3,9 @@ namespace Midas.Api.Models;
 
 public class RefreshToken
 {
-	public int Id { get; set; }
+	public Guid Id { get; set; }
 
-	public Client Client { get; set; }
-
-	public string TokenHash { get; set; } = "";
+	public string TokenHash { get; set; } = null!;
 
 	public DateTime ExpiresAt { get; set; }
 
@@ -17,7 +15,7 @@ public class RefreshToken
 
 	public bool IsActive => RevokedAt == null && !IsExpired;
 
-	public Guid ApplicationUserId { get; set; }
+	public Guid SessionId { get; set; }
 
-	public ApplicationUser User { get; set; } = null!;
+	public Session Session { get; set; } = null!;
 }

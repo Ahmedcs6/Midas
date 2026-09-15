@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -54,6 +55,13 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 	});
 builder.Services.AddHttpLogging();
 builder.Services.AddAuthorization();
+builder.Services
+	.AddControllers()
+	.AddJsonOptions(options =>
+	{
+		options.JsonSerializerOptions.Converters.Add(
+			new JsonStringEnumConverter());
+	});
 builder.Services.AddSingleton(
 	Channel.CreateBounded<IEmailJob>(
 		new BoundedChannelOptions(100)
@@ -66,6 +74,8 @@ builder.Services.AddSingleton(
 builder.Services.AddHostedService<EmailWorker>();
 builder.Services.AddTransient<GlobalExceptionHandlingMiddleware>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IClientInfoProvider, ClientInfoProvider>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IUserService, UserService>();

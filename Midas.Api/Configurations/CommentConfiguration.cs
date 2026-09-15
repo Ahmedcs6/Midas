@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-namespace Midas.Api.Configuration;
+namespace Midas.Api.Configurations;
 
-public class CommentEntityTypeConfiguration : IEntityTypeConfiguration<Comment>
+public class CommentConfiguration : IEntityTypeConfiguration<Comment>
 {
 	public void Configure(EntityTypeBuilder<Comment> builder)
 	{

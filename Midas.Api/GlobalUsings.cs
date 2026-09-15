@@ -20,7 +20,7 @@ global using Midas.Api.Models.Dtos.User.Response;
 global using Midas.Api.Models.Dtos.Post.Request;
 global using Midas.Api.Models.Dtos.Post.Response;
 
-global using Midas.Api.Configuration;
+global using Midas.Api.Configurations;
 global using Midas.Api.Data;
 global using Midas.Api.Data.Enum;
 global using Midas.Api.Helpers;
