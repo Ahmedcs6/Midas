@@ -2,16 +2,10 @@ namespace Midas.Api.Models.Dtos.Auth.Request;
 
 public class RegisterRequest
 {
-	[Required]
 	public string FirstName { get; set; } = string.Empty;
-	[Required]
 	public string LastName { get; set; } = string.Empty;
-	[Required]
-	public Gender Gender { get; set; } = 0;
-	[Required]
+	public Gender Gender { get; set; }
 	public string UserName { get; set; } = string.Empty;
-	[Required, EmailAddress]
 	public string Email { get; set; } = string.Empty;
-	[Required]
 	public string Password { get; set; } = string.Empty;
 }

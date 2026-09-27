@@ -2,10 +2,7 @@ namespace Midas.Api.Models.Dtos.Auth.Request;
 
 public class LoginRequest
 {
-	[Required, EmailAddress]
 	public string Email { get; set; } = string.Empty;
-	[Required]
 	public string Password { get; set; } = string.Empty;
-	[Required]
-	public Client Client { get; set; }
+	public Client? Client { get; set; }
 }
