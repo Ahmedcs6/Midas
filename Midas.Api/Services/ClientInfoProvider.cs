@@ -13,4 +13,8 @@ public sealed class ClientInfoProvider(
 		ClientInfo parsed = uaParser.Parse(userAgent);
 		return parsed;
 	}
+	public string? GetIpAddress()
+	{
+		return httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+	}
 }

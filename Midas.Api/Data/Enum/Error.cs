@@ -6,5 +6,6 @@ public enum Error
 	AuthenticationRequired,
 	AccessDenied,
 	NotFound,
-	Conflict
+	Conflict,
+	Locked
 }

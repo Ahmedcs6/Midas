@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="Midas.Api/Midas.Api.csproj" />
-  <Project Path="Midas.Tests/Midas.Tests.csproj" />
+  <Project Path="tests/Midas.UnitTests/Midas.UnitTests.csproj" />
+  <Project Path="tests/Midas.IntegrationTests/Midas.IntegrationTests.csproj" />
 </Solution>

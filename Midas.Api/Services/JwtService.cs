@@ -7,7 +7,13 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Midas.Api.Services;
 
-public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, UserManager<ApplicationUser> userManager, IOptions<JwtSettings> jwt, ApplicationDbContext context) : IJwtService
+public class JwtService(
+	ILogger<JwtService> logger,
+	Channel<IEmailJob> channel,
+	UserManager<ApplicationUser> userManager,
+	IOptions<JwtSettings> jwt,
+	ApplicationDbContext context
+) : IJwtService
 {
 	private readonly JwtSettings _jwt = jwt.Value;
 
@@ -18,8 +24,7 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 		var userClaims = await userManager.GetClaimsAsync(user);
 		var roles = await userManager.GetRolesAsync(user);
 
-		var roleClaims = roles.Select(role =>
-				new Claim(ClaimTypes.Role, role));
+		var roleClaims = roles.Select(role => new Claim(ClaimTypes.Role, role));
 
 		var claims = new[]
 		{
@@ -27,33 +32,45 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 			new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
 			new Claim(JwtRegisteredClaimNames.Email, user.Email!),
 			new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName!),
-			new Claim("session_id", sessionId.ToString())
+			new Claim("session_id", sessionId.ToString()),
 		}
-		.Union(userClaims)
+			.Union(userClaims)
 			.Union(roleClaims);
 
-		var symmetricSecurityKey =
-			new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));
+		var symmetricSecurityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));
 
-		var signingCredentials = new SigningCredentials(symmetricSecurityKey, SecurityAlgorithms.HmacSha256);
+		var signingCredentials = new SigningCredentials(
+			symmetricSecurityKey,
+			SecurityAlgorithms.HmacSha256
+		);
 
 		var jwtSecurityToken = new JwtSecurityToken(
-				issuer: _jwt.Issuer,
-				audience: _jwt.Audience,
-				claims: claims,
-				expires: DateTime.UtcNow.AddMinutes(_jwt.AccessTokenLifetimeMinutes),
-				signingCredentials: signingCredentials);
+			issuer: _jwt.Issuer,
+			audience: _jwt.Audience,
+			claims: claims,
+			expires: DateTime.UtcNow.AddMinutes(_jwt.AccessTokenLifetimeMinutes),
+			signingCredentials: signingCredentials
+		);
 
-		logger.LogDebug("JWT created for {UserId}, Session={SessionId}, Jti={Jti}, Expires={Expires}, Roles={Roles}", user.Id, sessionId, jwtSecurityToken.Id, jwtSecurityToken.ValidTo, string.Join(", ", roles));
+		logger.LogDebug(
+			"JWT created for {UserId}, Session={SessionId}, Jti={Jti}, Expires={Expires}, Roles={Roles}",
+			user.Id,
+			sessionId,
+			jwtSecurityToken.Id,
+			jwtSecurityToken.ValidTo,
+			string.Join(", ", roles)
+		);
 
 		return jwtSecurityToken;
 	}
+
 	public byte[] GenerateRefreshToken()
 	{
 		var bytes = RandomNumberGenerator.GetBytes(64);
 		logger.LogTrace("Generated refresh token bytes");
 		return bytes;
 	}
+
 	public async Task<Result<RefreshTokenResponse>> RefreshAsync(RefreshTokenRequest model)
 	{
 		byte[] bytes;
@@ -68,19 +85,17 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 			{
 				Success = false,
 				Error = Error.Validation,
-				Message = "Invalid token."
+				Message = "Invalid token.",
 			};
 		}
 		var hash = Convert.ToBase64String(SHA256.HashData(bytes));
 
-		var oldRefreshToken = await context.RefreshTokens
-			.Include(t => t.Session)
-			.ThenInclude(s => s.User)
-			.FirstOrDefaultAsync(t => t.TokenHash == hash);
+		var oldRefreshToken = await context
+			.RefreshTokens.Include(t => t.Session)
+				.ThenInclude(s => s.User)
+			.SingleOrDefaultAsync(rt => rt.TokenHash == hash && rt.Session.RevokedAt == null);
 
-		logger.LogDebug(
-				"Refresh attempt: token hash prefix {HashPrefix}",
-				hash[..8]);
+		logger.LogDebug("Refresh attempt: token hash prefix {HashPrefix}", hash[..8]);
 
 		if (oldRefreshToken is null)
 		{
@@ -90,7 +105,7 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 			{
 				Success = false,
 				Error = Error.Validation,
-				Message = "Invalid token."
+				Message = "Invalid token.",
 			};
 		}
 
@@ -99,58 +114,59 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 		if (oldRefreshToken.IsExpired)
 		{
 			logger.LogWarning(
-					"Refresh failed: expired token for {UserId}, expired at {ExpiredAt}",
-					user.Id,
-					oldRefreshToken.ExpiresAt);
+				"Refresh failed: expired token for {UserId}, expired at {ExpiredAt}",
+				user.Id,
+				oldRefreshToken.ExpiresAt
+			);
 
 			return new()
 			{
 				Success = false,
 				Error = Error.Validation,
-				Message = "Expired token."
+				Message = "Expired token.",
 			};
 		}
 
-		var rowsAffected = await context.RefreshTokens
-			.Where(t =>
-					t.Id == oldRefreshToken.Id &&
-					t.RevokedAt == null)
-			.ExecuteUpdateAsync(setters => setters
-					.SetProperty(t => t.RevokedAt, DateTime.UtcNow));
+		var rowsAffected = await context
+			.RefreshTokens.Where(t => t.Id == oldRefreshToken.Id && t.RevokedAt == null)
+			.ExecuteUpdateAsync(setters => setters.SetProperty(t => t.RevokedAt, DateTime.UtcNow));
 
 		if (rowsAffected == 0)
 		{
 			logger.LogError(
-					"SECURITY ALERT: Token reuse detected for {UserId}. Token {TokenId} was already revoked.",
-					user.Id,
-					oldRefreshToken.Id);
+				"SECURITY ALERT: Token reuse detected for {UserId}. Token {TokenId} was already revoked.",
+				user.Id,
+				oldRefreshToken.Id
+			);
 
-			await context.RefreshTokens
-				.Where(t =>
-						t.SessionId == oldRefreshToken.SessionId &&
-						t.RevokedAt == null)
-				.ExecuteUpdateAsync(setters => setters
-						.SetProperty(t => t.RevokedAt, DateTime.UtcNow));
+			await context
+				.RefreshTokens.Where(t =>
+					t.SessionId == oldRefreshToken.SessionId && t.RevokedAt == null
+				)
+				.ExecuteUpdateAsync(setters =>
+					setters.SetProperty(t => t.RevokedAt, DateTime.UtcNow)
+				);
 
 			logger.LogInformation(
-					"Revoked all active tokens for session {SessionId} due to suspected reuse",
-					oldRefreshToken.SessionId);
+				"Revoked all active tokens for session {SessionId} due to suspected reuse",
+				oldRefreshToken.SessionId
+			);
 
-			await channel.Writer.WriteAsync(
-					new SecurityAlertJob(user, user.Email!));
+			await channel.Writer.WriteAsync(new SecurityAlertJob(user, user.Email!));
 
 			return new()
 			{
 				Success = false,
 				Error = Error.AuthenticationRequired,
-				Message = "Revoked token."
+				Message = "Revoked token.",
 			};
 		}
 
 		logger.LogDebug(
-				"Revoked old refresh token {TokenId} for {UserId}",
-				oldRefreshToken.Id,
-				user.Id);
+			"Revoked old refresh token {TokenId} for {UserId}",
+			oldRefreshToken.Id,
+			user.Id
+		);
 
 		bytes = GenerateRefreshToken();
 
@@ -158,7 +174,7 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 		{
 			SessionId = oldRefreshToken.SessionId,
 			TokenHash = Convert.ToBase64String(SHA256.HashData(bytes)),
-			ExpiresAt = DateTime.UtcNow.AddDays(30)
+			ExpiresAt = DateTime.UtcNow.AddDays(30),
 		};
 
 		context.RefreshTokens.Add(newToken);
@@ -168,10 +184,11 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 		var accessToken = await CreateJwtTokenAsync(user, newToken.SessionId);
 
 		logger.LogInformation(
-				"Token refreshed for {UserId}: new token {TokenId}, expires {ExpiresAt}",
-				user.Id,
-				newToken.Id,
-				newToken.ExpiresAt);
+			"Token refreshed for {UserId}: new token {TokenId}, expires {ExpiresAt}",
+			user.Id,
+			newToken.Id,
+			newToken.ExpiresAt
+		);
 
 		return new()
 		{
@@ -181,8 +198,8 @@ public class JwtService(ILogger<JwtService> logger, Channel<IEmailJob> channel, 
 				AccessToken = new JwtSecurityTokenHandler().WriteToken(accessToken),
 				AccessTokenExpiresAt = accessToken.ValidTo,
 				RefreshToken = Convert.ToBase64String(bytes),
-				RefreshTokenExpiresAt = newToken.ExpiresAt
-			}
+				RefreshTokenExpiresAt = newToken.ExpiresAt,
+			},
 		};
 	}
 }

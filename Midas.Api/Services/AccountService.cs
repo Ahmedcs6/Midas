@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace Midas.Api.Services;
 
-public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> channel, UserManager<ApplicationUser> userManager, ApplicationDbContext context, IJwtService jwtService, IOptions<AppSettings> settings, IClientInfoProvider clientInfoProvider) : IAccountService
+public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> channel, UserManager<ApplicationUser> userManager, ApplicationDbContext context, IJwtService jwtService, IOptions<AppSettings> settings, IClientInfoProvider clientInfoProvider, SignInManager<ApplicationUser> signInManager) : IAccountService
 {
 
 	public async Task<Result<UserResponse>> RegisterAsync(RegisterRequest request)
@@ -24,14 +24,10 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 
 		if (!result.Succeeded)
 		{
-			logger.LogWarning(
-							"Registration failed for {Email}. Errors: {Errors}",
-							request.Email,
-							string.Join(", ", result.Errors.Select(e => e.Description)));
+			logger.LogWarning("Registration failed for {Email}. Errors: {Errors}", request.Email, string.Join(", ", result.Errors.Select(e => e.Description)));
 			var errors = result.Errors.ToList();
 
-			var error = errors.Any(e =>
-				e.Code is "DuplicateUserName" or "DuplicateEmail")
+			var error = errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail")
 				? Error.Conflict
 				: Error.Validation;
 
@@ -53,7 +49,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		}
 		await transaction.CommitAsync();
 		logger.LogInformation("User registered: {UserId} ({Email})", user.Id, user.Email);
-
+		await SendConfirmEmailAsync(new() { Email = user.Email });
 		return new()
 		{
 			Success = true,
@@ -70,9 +66,21 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 	public async Task<Result<RefreshTokenResponse>> LoginAsync(LoginRequest request)
 	{
 		var user = await userManager.FindByEmailAsync(request.Email);
-		if (user is not null && !await userManager.IsEmailConfirmedAsync(user))
+		if (user is null)
 		{
-			logger.LogWarning("Login blocked: email not confirmed for {Email}", request.Email);
+			logger.LogWarning("Failed login attempt for {Email}", request.Email);
+			return new()
+			{
+				Success = false,
+				Error = Error.AuthenticationRequired,
+				Message = "Invalid email or password."
+			};
+		}
+		if (!await userManager.IsEmailConfirmedAsync(user))
+		{
+			logger.LogWarning(
+				"Login blocked: email not confirmed for {Email}",
+				request.Email);
 			return new()
 			{
 				Success = false,
@@ -80,9 +88,23 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 				Message = "Please confirm your email."
 			};
 		}
-		if (user is null || !await userManager.CheckPasswordAsync(user, request.Password))
+		var signInResult = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+		if (signInResult.IsLockedOut)
+		{
+			logger.LogWarning("Login blocked: account locked out for {UserId}", user.Id);
+
+			return new()
+			{
+				Success = false,
+				Error = Error.Locked,
+				Message = "Account is temporarily locked."
+			};
+		}
+
+		if (!signInResult.Succeeded)
 		{
 			logger.LogWarning("Failed login attempt for {Email}", request.Email);
+
 			return new()
 			{
 				Success = false,
@@ -94,9 +116,11 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		var session = new Session
 		{
 			UserId = user.Id,
-			Client = request.Client,
+			Client = request.Client!.Value,
 			OperatingSystem = clientInfo.OS.Family,
-			Browser = clientInfo.UA.Family
+			Browser = clientInfo.UA.Family,
+			Device = clientInfo.Device.Brand,
+			IpAddress = clientInfoProvider.GetIpAddress()
 		};
 		var bytes = jwtService.GenerateRefreshToken();
 		var refreshToken = new RefreshToken
@@ -247,6 +271,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 				Message = "Invalid token."
 			};
 		}
+		await using var transaction = await context.Database.BeginTransactionAsync();
 		var result = await userManager.ResetPasswordAsync(user, token, request.NewPassword);
 		if (!result.Succeeded)
 		{
@@ -261,6 +286,23 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 				Message = string.Join(", ", result.Errors.Select(e => e.Description))
 			};
 		}
+		var now = DateTime.UtcNow;
+
+		await context.RefreshTokens
+			.Where(x =>
+				x.Session.UserId == user.Id &&
+				x.Session.RevokedAt == null &&
+				x.RevokedAt == null)
+			.ExecuteUpdateAsync(setters => setters
+				.SetProperty(x => x.RevokedAt, now));
+
+		await context.Sessions
+			.Where(x =>
+				x.UserId == user.Id &&
+				x.RevokedAt == null)
+			.ExecuteUpdateAsync(setters => setters
+				.SetProperty(x => x.RevokedAt, now));
+		await transaction.CommitAsync();
 		logger.LogInformation("Password reset successful for {UserId}", user.Id);
 		return new()
 		{
