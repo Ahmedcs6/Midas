@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Midas.Api.Interfaces;
 using Midas.Api.Models.Dtos;
-namespace Midas.Tests;
+namespace Midas.IntegrationTests;
 
 public class FakeEmailSender(ILogger<FakeEmailSender> logger) : IEmailSender
 {

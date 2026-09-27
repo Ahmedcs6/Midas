@@ -8,7 +8,7 @@ using Midas.Api.Helpers.Responses;
 using Midas.Api.Models.Dtos.User.Request;
 using Midas.Api.Models.Dtos.User.Response;
 
-namespace Midas.Tests;
+namespace Midas.IntegrationTests;
 
 [Collection("Api collection")]
 public class UserTests(CustomWebApplicationFactory factory) : ApiTestBase(factory)

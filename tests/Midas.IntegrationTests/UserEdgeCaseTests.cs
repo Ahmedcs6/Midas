@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using Midas.Api.Helpers.Responses;
 using Midas.Api.Models.Dtos.User.Response;
 
-namespace Midas.Tests;
+namespace Midas.IntegrationTests;
 
 [Collection("Api collection")]
 public class UserEdgeCaseTests(CustomWebApplicationFactory factory) : ApiTestBase(factory)
@@ -20,7 +20,10 @@ public class UserEdgeCaseTests(CustomWebApplicationFactory factory) : ApiTestBas
 	public async Task EditUser_WithoutAuth_Should_Return_Unauthorized()
 	{
 		using var client = CreateClient();
-		var response = await client.PatchAsync("/api/Users/me", JsonContent.Create(new { about = "x" }));
+		var response = await client.PatchAsync(
+			"/api/Users/me",
+			JsonContent.Create(new { about = "x" })
+		);
 		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 	}
 
@@ -30,7 +33,8 @@ public class UserEdgeCaseTests(CustomWebApplicationFactory factory) : ApiTestBas
 		using var client = CreateClient();
 		var (token, _) = await LoginAsMainAsync(client);
 		var response = await client.SendAsync(
-			Authenticated(HttpMethod.Post, $"/api/Users/follow/ghost_{Guid.NewGuid():N}", token));
+			Authenticated(HttpMethod.Post, $"/api/Users/follow/ghost_{Guid.NewGuid():N}", token)
+		);
 		Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 	}
 
@@ -38,7 +42,10 @@ public class UserEdgeCaseTests(CustomWebApplicationFactory factory) : ApiTestBas
 	public async Task Follow_WithoutAuth_Should_Return_Unauthorized()
 	{
 		using var client = CreateClient();
-		var response = await client.PostAsync($"/api/Users/follow/{TestHelpers.TestUserName}", null);
+		var response = await client.PostAsync(
+			$"/api/Users/follow/{TestHelpers.TestUserName}",
+			null
+		);
 		Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 	}
 
@@ -48,7 +55,8 @@ public class UserEdgeCaseTests(CustomWebApplicationFactory factory) : ApiTestBas
 		using var client = CreateClient();
 		var (token, _) = await LoginAsMainAsync(client);
 		var response = await client.SendAsync(
-			Authenticated(HttpMethod.Post, $"/api/Users/follow/{TestHelpers.TestUserName}", token));
+			Authenticated(HttpMethod.Post, $"/api/Users/follow/{TestHelpers.TestUserName}", token)
+		);
 		Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 	}
 
@@ -58,38 +66,48 @@ public class UserEdgeCaseTests(CustomWebApplicationFactory factory) : ApiTestBas
 		using var client = CreateClient();
 		// Unique peer per test: counts always start at 0, no cross-test pollution.
 		var peerUser = await TestHelpers.EnsureUniqueUserAsync(Factory.Services, "peer");
-		var peerUserName = peerUser.UserName!;
+		var peerUserName = peerUser.UserName;
 		var (token, _) = await LoginAsMainAsync(client);
 
 		// Ensure clean slate: unfollow if a previous run left the relation behind.
-		await client.SendAsync(Authenticated(HttpMethod.Delete, $"/api/Users/follow/{peerUserName}", token));
+		await client.SendAsync(
+			Authenticated(HttpMethod.Delete, $"/api/Users/follow/{peerUserName}", token)
+		);
 
 		var follow = await client.SendAsync(
-			Authenticated(HttpMethod.Post, $"/api/Users/follow/{peerUserName}", token));
+			Authenticated(HttpMethod.Post, $"/api/Users/follow/{peerUserName}", token)
+		);
 		Assert.Equal(HttpStatusCode.OK, follow.StatusCode);
 
 		var duplicate = await client.SendAsync(
-			Authenticated(HttpMethod.Post, $"/api/Users/follow/{peerUserName}", token));
+			Authenticated(HttpMethod.Post, $"/api/Users/follow/{peerUserName}", token)
+		);
 		Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
 
 		var peer = await client.GetFromJsonAsync<ApiResponse<UserResponse>>(
-			$"/api/Users/{peerUserName}", JsonOptions);
+			$"/api/Users/{peerUserName}",
+			JsonOptions
+		);
 		Assert.NotNull(peer);
 		Assert.NotNull(peer.Data);
 		Assert.Equal(1, peer.Data.FollowersNumber);
 
 		var unfollow = await client.SendAsync(
-			Authenticated(HttpMethod.Delete, $"/api/Users/follow/{peerUserName}", token));
+			Authenticated(HttpMethod.Delete, $"/api/Users/follow/{peerUserName}", token)
+		);
 		Assert.Equal(HttpStatusCode.NoContent, unfollow.StatusCode);
 
 		var peerAfter = await client.GetFromJsonAsync<ApiResponse<UserResponse>>(
-			$"/api/Users/{peerUserName}", JsonOptions);
+			$"/api/Users/{peerUserName}",
+			JsonOptions
+		);
 		Assert.NotNull(peerAfter);
 		Assert.NotNull(peerAfter.Data);
 		Assert.Equal(0, peerAfter.Data.FollowersNumber);
 
 		var unfollowAgain = await client.SendAsync(
-			Authenticated(HttpMethod.Delete, $"/api/Users/follow/{peerUserName}", token));
+			Authenticated(HttpMethod.Delete, $"/api/Users/follow/{peerUserName}", token)
+		);
 		Assert.Equal(HttpStatusCode.NotFound, unfollowAgain.StatusCode);
 	}
 
@@ -99,7 +117,8 @@ public class UserEdgeCaseTests(CustomWebApplicationFactory factory) : ApiTestBas
 		using var client = CreateClient();
 		var (token, _) = await LoginAsMainAsync(client);
 		var response = await client.SendAsync(
-			Authenticated(HttpMethod.Delete, $"/api/Users/follow/ghost_{Guid.NewGuid():N}", token));
+			Authenticated(HttpMethod.Delete, $"/api/Users/follow/ghost_{Guid.NewGuid():N}", token)
+		);
 		Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 	}
 }

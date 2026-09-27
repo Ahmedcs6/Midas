@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Midas.Api.Models;
 
-namespace Midas.Tests;
+namespace Midas.IntegrationTests;
 
 public static class TestHelpers
 {
@@ -14,23 +14,23 @@ public static class TestHelpers
 	public static string UniqueUserName(string prefix)
 	{
 		var name = $"{prefix}_{Guid.NewGuid():N}";
-		return name.Length <= 32 ? name : name.Substring(0, 32);
+		return name.Length <= 32 ? name : name[..32];
 	}
 
-	public static string UniqueEmail(string prefix)
-		=> $"{prefix}_{Guid.NewGuid():N}@example.com";
+	public static string UniqueEmail(string prefix) => $"{prefix}_{Guid.NewGuid():N}@example.com";
 
 	public static Task<ApplicationUser> EnsureUniqueUserAsync(
 		IServiceProvider services,
 		string prefix = "u",
-		string password = UniqueTestPassword)
-		=> EnsureUserAsync(services, UniqueEmail(prefix), UniqueUserName(prefix), password);
+		string password = UniqueTestPassword
+	) => EnsureUserAsync(services, UniqueEmail(prefix), UniqueUserName(prefix), password);
 
 	public static async Task<ApplicationUser> EnsureUserAsync(
 		IServiceProvider services,
 		string email = TestEmail,
 		string userName = TestUserName,
-		string password = TestPassword)
+		string password = TestPassword
+	)
 	{
 		using var scope = services.CreateScope();
 		var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -45,24 +45,30 @@ public static class TestHelpers
 			LastName = "Mahmoud",
 			UserName = userName,
 			Email = email,
-			EmailConfirmed = false
+			EmailConfirmed = false,
 		};
 
 		var result = await userManager.CreateAsync(user, password);
 		if (!result.Succeeded)
 			throw new InvalidOperationException(
-				"Test user creation failed: " + string.Join(", ", result.Errors.Select(e => e.Description)));
+				"Test user creation failed: "
+					+ string.Join(", ", result.Errors.Select(e => e.Description))
+			);
 
 		result = await userManager.AddToRoleAsync(user, "User");
 		if (!result.Succeeded)
 			throw new InvalidOperationException(
-				"Test user role assignment failed: " + string.Join(", ", result.Errors.Select(e => e.Description)));
+				"Test user role assignment failed: "
+					+ string.Join(", ", result.Errors.Select(e => e.Description))
+			);
 
 		var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
 		result = await userManager.ConfirmEmailAsync(user, token);
 		if (!result.Succeeded)
 			throw new InvalidOperationException(
-				"Test user email confirmation failed: " + string.Join(", ", result.Errors.Select(e => e.Description)));
+				"Test user email confirmation failed: "
+					+ string.Join(", ", result.Errors.Select(e => e.Description))
+			);
 
 		return user;
 	}

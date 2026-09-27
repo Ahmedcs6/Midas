@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Midas.Api.Interfaces;
 
-namespace Midas.Tests;
+namespace Midas.IntegrationTests;
 
 public class CustomWebApplicationFactory
 	: WebApplicationFactory<Program>
