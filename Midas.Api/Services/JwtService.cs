@@ -67,7 +67,6 @@ public class JwtService(
 	public byte[] GenerateRefreshToken()
 	{
 		var bytes = RandomNumberGenerator.GetBytes(64);
-		logger.LogTrace("Generated refresh token bytes");
 		return bytes;
 	}
 
@@ -94,8 +93,6 @@ public class JwtService(
 			.RefreshTokens.Include(t => t.Session)
 				.ThenInclude(s => s.User)
 			.SingleOrDefaultAsync(rt => rt.TokenHash == hash && rt.Session.RevokedAt == null);
-
-		logger.LogDebug("Refresh attempt: token hash prefix {HashPrefix}", hash[..8]);
 
 		if (oldRefreshToken is null)
 		{

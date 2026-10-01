@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using FluentValidation;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Midas.Api.Middlewares;
 using Midas.Api.Validators;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +25,12 @@ builder
 	.Validate(s => !string.IsNullOrEmpty(s.Key), "JwtSettings:Key is required")
 	.ValidateOnStart();
 
+builder.Host.UseSerilog(
+	(context, configuration) =>
+	{
+		configuration.ReadFrom.Configuration(context.Configuration);
+	}
+);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 	options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
 );
@@ -66,7 +74,6 @@ builder
 			};
 		}
 	);
-builder.Services.AddHttpLogging();
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton(
 	Channel.CreateBounded<IEmailJob>(
@@ -105,7 +112,17 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-app.UseHttpLogging();
+app.UseSerilogRequestLogging(options =>
+{
+	options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+	{
+		var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+		diagnosticContext.Set("UserId", userId ?? "anonymous");
+		var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString();
+		if (!string.IsNullOrEmpty(remoteIp))
+			diagnosticContext.Set("ClientIP", remoteIp);
+	};
+});
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 if (app.Environment.IsDevelopment())

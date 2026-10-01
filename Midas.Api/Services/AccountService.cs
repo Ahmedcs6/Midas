@@ -45,7 +45,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 						  "Failed to assign 'User' role to {UserId}. Errors: {Errors}",
 						  user.Id,
 						  string.Join(", ", result.Errors.Select(e => e.Description)));
-			throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
+			throw new InvalidOperationException(string.Join(", ", result.Errors.Select(e => e.Description)));
 		}
 		await transaction.CommitAsync();
 		logger.LogInformation("User registered: {UserId} ({Email})", user.Id, user.Email);
@@ -135,14 +135,11 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		var token = await jwtService.CreateJwtTokenAsync(user, session.Id);
 
 		logger.LogInformation(
-			"User logged in: {UserId} ({Email}) from client {Client}",
+			"User logged in: {UserId} ({Email}) from client {Client}, session {SessionId}, refresh expires {ExpiresAt:O}",
 			user.Id,
 			user.Email,
-			request.Client);
-
-		logger.LogInformation(
-			"Issued new refresh token for {UserId}, expires {ExpiresAt:O}",
-			user.Id,
+			request.Client,
+			session.Id,
 			refreshToken.ExpiresAt);
 
 		return new()
@@ -226,7 +223,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 
 		if (!result.Succeeded)
 		{
-			logger.LogError(
+			logger.LogWarning(
 							"Email confirmation failed for {UserId}. Errors: {Errors}",
 							userId,
 							string.Join(", ", result.Errors.Select(e => e.Description)));
@@ -275,7 +272,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 		var result = await userManager.ResetPasswordAsync(user, token, request.NewPassword);
 		if (!result.Succeeded)
 		{
-			logger.LogError(
+			logger.LogWarning(
 							"Password reset failed for {UserId}. Errors: {Errors}",
 							request.Id,
 							string.Join(", ", result.Errors.Select(e => e.Description)));

@@ -8,17 +8,21 @@ public sealed class EmailWorker(Channel<IEmailJob> channel, IServiceScopeFactory
 {
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
-		await foreach (var job in channel.Reader.ReadAllAsync(CancellationToken.None))
+		await foreach (var job in channel.Reader.ReadAllAsync(stoppingToken))
 		{
 			try
 			{
 				await using var scope = serviceScopeFactory.CreateAsyncScope();
 				var emailSender = scope.ServiceProvider.GetRequiredService<IEmailSender>();
-				await emailSender.SendAsync(job, CancellationToken.None);
+				await emailSender.SendAsync(job, stoppingToken);
+			}
+			catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+			{
+				break;
 			}
 			catch (Exception e)
 			{
-				logger.LogError(e, "failed to process email job");
+				logger.LogError(e, "Failed to process email job {JobType}", job.GetType().Name);
 			}
 		}
 	}
