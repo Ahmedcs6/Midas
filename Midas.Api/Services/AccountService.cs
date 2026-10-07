@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace Midas.Api.Services;
 
-public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> channel, UserManager<ApplicationUser> userManager, ApplicationDbContext context, IJwtService jwtService, IOptions<AppSettings> settings, IClientInfoProvider clientInfoProvider, SignInManager<ApplicationUser> signInManager) : IAccountService
+public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> channel, UserManager<ApplicationUser> userManager, ApplicationDbContext context, IJwtService jwtService, ISessionService sessionService, IOptions<AppSettings> settings, IClientInfoProvider clientInfoProvider, SignInManager<ApplicationUser> signInManager) : IAccountService
 {
 
 	public async Task<Result<UserResponse>> RegisterAsync(RegisterRequest request)
@@ -283,22 +283,7 @@ public class AccountService(ILogger<AccountService> logger, Channel<IEmailJob> c
 				Message = string.Join(", ", result.Errors.Select(e => e.Description))
 			};
 		}
-		var now = DateTime.UtcNow;
-
-		await context.RefreshTokens
-			.Where(x =>
-				x.Session.UserId == user.Id &&
-				x.Session.RevokedAt == null &&
-				x.RevokedAt == null)
-			.ExecuteUpdateAsync(setters => setters
-				.SetProperty(x => x.RevokedAt, now));
-
-		await context.Sessions
-			.Where(x =>
-				x.UserId == user.Id &&
-				x.RevokedAt == null)
-			.ExecuteUpdateAsync(setters => setters
-				.SetProperty(x => x.RevokedAt, now));
+		await sessionService.RevokeAllAsync(user.Id);
 		await transaction.CommitAsync();
 		logger.LogInformation("Password reset successful for {UserId}", user.Id);
 		return new()

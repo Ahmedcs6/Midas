@@ -10,6 +10,7 @@ public static class ApplicationServicesExtensions
 		services.AddHttpContextAccessor();
 		services.AddScoped<IClientInfoProvider, ClientInfoProvider>();
 		services.AddScoped<IJwtService, JwtService>();
+		services.AddScoped<ISessionService, SessionService>();
 		services.AddScoped<IAccountService, AccountService>();
 		services.AddScoped<IUserService, UserService>();
 		services.AddScoped<IPostService, PostService>();
